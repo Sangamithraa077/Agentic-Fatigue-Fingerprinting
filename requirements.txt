@@ -1,0 +1,6 @@
+# Project dependencies
+# Add packages as they are introduced, e.g.:
+# numpy
+# scikit-learn
+
+pandas
