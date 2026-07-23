@@ -1,8 +1,12 @@
 # Project dependencies
 # Add packages as they are introduced, e.g.:
-# numpy
 # scikit-learn
 
+numpy
+scipy
 pandas
 matplotlib
 seaborn
+
+# Testing
+pytest
