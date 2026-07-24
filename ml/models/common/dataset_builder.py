@@ -198,7 +198,7 @@ def _rank_by_mutual_information(matrix: pd.DataFrame, y_valid: np.ndarray, valid
 _EXTREME_OUTLIER_ROBUST_Z_THRESHOLD = 1000.0
 
 
-def _impute_and_clean(X: np.ndarray) -> Tuple[np.ndarray, int]:
+def impute_and_clean(X: np.ndarray) -> Tuple[np.ndarray, int]:
     """Replace +/-inf with NaN, then impute NaN (and confirmed extreme
     outliers) with each column's median.
 
@@ -263,7 +263,7 @@ def build_modeling_dataset(dataset: FeatureDataset, config: DatasetConfig) -> Mo
     y = y_full[valid_mask]
     groups = dataset.metadata["subject_id"].to_numpy()[valid_mask]
 
-    X_clean, n_imputed = _impute_and_clean(X)
+    X_clean, n_imputed = impute_and_clean(X)
     if n_imputed:
         logger.info("%s: imputed %d NaN/infinite feature value(s) with column medians.", dataset.modality, n_imputed)
 

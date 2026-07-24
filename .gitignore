@@ -35,6 +35,8 @@ ml/models/artifacts/classical/*
 !ml/models/artifacts/classical/.gitkeep
 ml/models/artifacts/deep_learning/*
 !ml/models/artifacts/deep_learning/.gitkeep
+ml/models/artifacts/proposed/*
+!ml/models/artifacts/proposed/.gitkeep
 
 # Logs
 *.log
