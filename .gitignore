@@ -29,6 +29,13 @@ datasets/raw/WSD4FEDSRM.zip
 datasets/processed/*
 !datasets/processed/.gitkeep
 
+# Trained model artifacts (regeneratable via notebooks/phase9_baseline_models_report.py;
+# some RandomForest checkpoints exceed GitHub's 100MB per-file limit)
+ml/models/artifacts/classical/*
+!ml/models/artifacts/classical/.gitkeep
+ml/models/artifacts/deep_learning/*
+!ml/models/artifacts/deep_learning/.gitkeep
+
 # Logs
 *.log
 

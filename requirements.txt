@@ -1,12 +1,15 @@
 # Project dependencies
-# Add packages as they are introduced, e.g.:
-# scikit-learn
-
 numpy
 scipy
 pandas
 matplotlib
 seaborn
+scikit-learn
+joblib
+
+# Phase 9: baseline modeling
+torch
+xgboost
 
 # Testing
 pytest
