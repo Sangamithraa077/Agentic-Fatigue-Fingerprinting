@@ -14,6 +14,7 @@ if project_root not in sys.path:
 import numpy as np
 from fastapi import FastAPI, HTTPException  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from fastapi.staticfiles import StaticFiles  # type: ignore
 from pydantic import BaseModel, Field  # type: ignore
 
 from backend.agents.orchestrator import AgentOrchestrator
@@ -32,6 +33,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Dashboard Static Files
+dashboard_dir = Path(__file__).resolve().parents[2] / "dashboard"
+if dashboard_dir.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
 # Global Agent Orchestrator instance
 orchestrator = AgentOrchestrator()

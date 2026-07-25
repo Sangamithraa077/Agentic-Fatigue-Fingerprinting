@@ -1,6 +1,3 @@
-import './style.css';
-import Chart from 'chart.js/auto';
-
 // State Management
 let isPlaying = true;
 let activeTab = 'signals';
