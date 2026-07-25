@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import matplotlib
 
@@ -30,7 +30,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ml.data_models.dataset import Dataset
-from ml.data_models.enums import ConditionType, Direction, EMGMuscle, IMULocation
+from ml.data_models.enums import Direction, EMGMuscle, IMULocation
 from ml.preprocessing.dataset_loader import WSD4FEDSRMLoader
 
 logger = logging.getLogger(__name__)

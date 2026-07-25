@@ -11,7 +11,7 @@ import pytest
 
 from ml.feature_engineering.feature_dataset import FeatureDataset
 from ml.models.common.callbacks import EarlyStopping, ModelCheckpoint
-from ml.models.common.config import DatasetConfig, SplitConfig, TrainingConfig
+from ml.models.common.config import DatasetConfig, SplitConfig
 from ml.models.common.data_splitter import stratified_group_kfold_split, train_val_test_group_split
 from ml.models.common.dataset_builder import (
     apply_scaler,

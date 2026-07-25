@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold

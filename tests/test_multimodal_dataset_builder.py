@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from ml.feature_engineering.feature_dataset import FeatureDataset
 from ml.models.common.config import DatasetConfig

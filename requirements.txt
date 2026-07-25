@@ -9,7 +9,7 @@ joblib
 
 # Deep Learning & Modeling
 torch
-# xgboost
+xgboost
 
 # Explainability
 shap
@@ -20,3 +20,4 @@ uvicorn
 
 # Testing
 pytest
+httpx2
