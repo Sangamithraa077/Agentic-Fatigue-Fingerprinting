@@ -8,11 +8,11 @@ scikit-learn
 joblib
 
 # Phase 9: baseline modeling
-torch
-xgboost
+# torch
+# xgboost
 
 # Phase 11: explainability
-shap
+# shap
 
 # Testing
 pytest

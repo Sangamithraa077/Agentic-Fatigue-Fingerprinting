@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agentic Fatigue Fingerprinting - Research Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h2>FatigueAI</h2>
+            <span>Research Fingerprinting</span>
+          </div>
+        </div>
+
+        <nav class="nav-menu">
+          <button class="nav-item active" data-tab="signals">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <span>Multimodal Signals</span>
+          </button>
+          <button class="nav-item" data-tab="predictions">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+            <span>Fatigue Fingerprint</span>
+          </button>
+          <button class="nav-item" data-tab="explainability">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            <span>SHAP Explainability</span>
+          </button>
+          <button class="nav-item" data-tab="personalization">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Personalization & LOSO</span>
+          </button>
+          <button class="nav-item" data-tab="agents">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span>Agent Control Loop</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="subject-selector-box">
+            <label for="subjectSelect">Subject Context:</label>
+            <select id="subjectSelect">
+              <option value="P01">Subject P01 (Female, 31y)</option>
+              <option value="P02">Subject P02 (Female, 23y)</option>
+              <option value="P03" selected>Subject P03 (Male, 26y)</option>
+              <option value="P04">Subject P04 (Male, 25y)</option>
+              <option value="P05">Subject P05 (Female, 21y)</option>
+              <option value="P06">Subject P06 (Male, 26y)</option>
+            </select>
+          </div>
+          <div class="status-indicator">
+            <span class="pulse-dot"></span>
+            <span class="status-text">Pipeline: Live (1000Hz EMG / 100Hz IMU / 200Hz PPG)</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Top Banner Header -->
+        <header class="top-header">
+          <div class="header-title">
+            <h1 id="pageTitle">Multimodal Sensor Stream Analysis</h1>
+            <p id="pageSubtitle">Real-time signal inspection, artifact filtering, and synchronized feature extraction</p>
+          </div>
+          <div class="header-actions">
+            <div class="badge badge-success">WSD4FEDSRM Corpus</div>
+            <div class="badge badge-purple">TCN + SHAP Ensemble</div>
+            <button class="btn btn-outline" id="togglePlayback">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span id="playbackBtnText">Pause Stream</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Dynamic View Containers -->
+        <div class="content-body">
+          
+          <!-- TAB 1: SIGNALS -->
+          <section id="tab-signals" class="tab-content active">
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-header">
+                  <span class="metric-label">EMG RMS (Anterior Deltoid)</span>
+                  <span class="metric-badge">1000 Hz</span>
+                </div>
+                <div class="metric-value" id="emgRmsVal">0.482 <span class="unit">mV</span></div>
+                <div class="metric-trend trend-up">↑ +14.2% fatigue drift</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-header">
+                  <span class="metric-label">IMU Mean Jerk (Upper Arm)</span>
+                  <span class="metric-badge">100 Hz</span>
+                </div>
+                <div class="metric-value" id="imuJerkVal">12.4 <span class="unit">m/s³</span></div>
+                <div class="metric-trend trend-up">↑ Tremor buildup</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-header">
+                  <span class="metric-label">PPG Heart Rate</span>
+                  <span class="metric-badge">200 Hz</span>
+                </div>
+                <div class="metric-value" id="ppgHrVal">118 <span class="unit">BPM</span></div>
+                <div class="metric-trend trend-neutral">~ Moderate exertion</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-header">
+                  <span class="metric-label">Current Task Condition</span>
+                  <span class="metric-badge">Load 50-60%</span>
+                </div>
+                <div class="metric-value" style="font-size: 1.25rem; color: var(--color-accent);">External Rotation</div>
+                <div class="metric-trend">Task 6 / 50-60% MVIC</div>
+              </div>
+            </div>
+
+            <div class="charts-grid-2x2">
+              <div class="chart-card span-2">
+                <div class="chart-header">
+                  <div>
+                    <h3>Surface Electromyography (sEMG) - 6 Muscle Channels</h3>
+                    <p class="chart-sub">Raw signal with Butterworth bandpass (20-450 Hz) and notch filtering</p>
+                  </div>
+                  <div class="channel-pills">
+                    <span class="pill active">Ant. Deltoid</span>
+                    <span class="pill active">Infraspinatus</span>
+                    <span class="pill active">Lat. Dorsi</span>
+                    <span class="pill">Pect. Major</span>
+                    <span class="pill">Post. Deltoid</span>
+                    <span class="pill">Upp. Trapezius</span>
+                  </div>
+                </div>
+                <div class="chart-container">
+                  <canvas id="emgChart"></canvas>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>
+                    <h3>IMU Kinematics (Upper Arm 3-Axis Acc)</h3>
+                    <p class="chart-sub">Tri-axial acceleration during shoulder rotation cycles</p>
+                  </div>
+                </div>
+                <div class="chart-container">
+                  <canvas id="imuChart"></canvas>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>
+                    <h3>PPG Blood Volume Pulse (BVP)</h3>
+                    <p class="chart-sub">Infrared absorption waveform (200Hz finger sensor)</p>
+                  </div>
+                </div>
+                <div class="chart-container">
+                  <canvas id="ppgChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 2: FATIGUE FINGERPRINT -->
+          <section id="tab-predictions" class="tab-content">
+            <div class="split-view">
+              <div class="card gauge-card">
+                <h3>Estimated Borg RPE Fatigue Level</h3>
+                <p class="chart-sub">Ground Truth vs Baseline RF vs Deep TCN Model</p>
+
+                <div class="gauge-container">
+                  <div class="gauge-value-display">
+                    <span class="rpe-number" id="currentRpe">16.4</span>
+                    <span class="rpe-scale">/ 20</span>
+                  </div>
+                  <div class="rpe-status-label danger">Heavy Fatigue / Exhaustion</div>
+                </div>
+
+                <div class="fingerprint-summary">
+                  <div class="fp-row">
+                    <span>Predicted Borg RPE:</span>
+                    <strong>16.4 (± 0.6)</strong>
+                  </div>
+                  <div class="fp-row">
+                    <span>Predicted KSS Sleepiness:</span>
+                    <strong>7 / 9 (Sleepy)</strong>
+                  </div>
+                  <div class="fp-row">
+                    <span>EMG Median Freq Shift:</span>
+                    <strong style="color: var(--color-danger);">-24.5 Hz (Fatigue)</strong>
+                  </div>
+                  <div class="fp-row">
+                    <span>Task Endurance Limit:</span>
+                    <strong>182 sec / 210 sec</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card flex-1">
+                <div class="chart-header">
+                  <div>
+                    <h3>Fatigue Progression Trajectory (Trial Duration)</h3>
+                    <p class="chart-sub">Comparing Borg RPE score drift over time across internal/external rotation tasks</p>
+                  </div>
+                </div>
+                <div class="chart-container" style="height: 340px;">
+                  <canvas id="fatigueProgressionChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-card margin-top">
+              <div class="chart-header">
+                <div>
+                  <h3>Muscle-Specific Spectral Fatigue Fingerprint</h3>
+                  <p class="chart-sub">Mean Frequency (MNF) and Median Frequency (MDF) degradation across shoulder muscles</p>
+                </div>
+              </div>
+              <div class="chart-container" style="height: 260px;">
+                <canvas id="muscleSpectralChart"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 3: SHAP EXPLAINABILITY -->
+          <section id="tab-explainability" class="tab-content">
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-label">Top Contributing Feature</div>
+                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-cyan);">EMG_MDF_AntDeltoid</div>
+                <div class="metric-trend">+2.84 SHAP impact score</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Secondary Driver</div>
+                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-accent);">IMU_Jerk_UpperArm</div>
+                <div class="metric-trend">+1.62 SHAP impact score</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Model Confidence Interval</div>
+                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-success);">94.2%</div>
+                <div class="metric-trend">SHAP TreeExplainer calibrated</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Anthropometric Interaction</div>
+                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-purple);">UpperArm_Length</div>
+                <div class="metric-trend">+0.95 Modulating weight</div>
+              </div>
+            </div>
+
+            <div class="split-view margin-top">
+              <div class="chart-card flex-1">
+                <div class="chart-header">
+                  <div>
+                    <h3>Global SHAP Feature Importance</h3>
+                    <p class="chart-sub">Mean absolute SHAP value across all 34 WSD4FEDSRM subjects</p>
+                  </div>
+                </div>
+                <div class="chart-container" style="height: 360px;">
+                  <canvas id="shapBarChart"></canvas>
+                </div>
+              </div>
+
+              <div class="chart-card flex-1">
+                <div class="chart-header">
+                  <div>
+                    <h3>Local Explanation Waterfall (Sample #420)</h3>
+                    <p class="chart-sub">Feature push/pull vectors driving the single-sample prediction to RPE 16.4</p>
+                  </div>
+                </div>
+                <div class="chart-container" style="height: 360px;">
+                  <canvas id="shapWaterfallChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 4: PERSONALIZATION & LOSO -->
+          <section id="tab-personalization" class="tab-content">
+            <div class="card">
+              <div class="chart-header">
+                <div>
+                  <h3>Subject Profile & Anthropometric Fingerprint: Subject P03</h3>
+                  <p class="chart-sub">Demographic characteristics used for Leave-One-Subject-Out (LOSO) domain adaptation</p>
+                </div>
+              </div>
+              <div class="profile-grid">
+                <div class="profile-item">
+                  <span class="p-label">Sex / Age:</span>
+                  <span class="p-val">Male / 26 years</span>
+                </div>
+                <div class="profile-item">
+                  <span class="p-label">Height / Weight:</span>
+                  <span class="p-val">183 cm / 78 kg</span>
+                </div>
+                <div class="profile-item">
+                  <span class="p-label">Dominant Hand:</span>
+                  <span class="p-val">Right</span>
+                </div>
+                <div class="profile-item">
+                  <span class="p-label">Upper Arm Length:</span>
+                  <span class="p-val">34.2 cm</span>
+                </div>
+                <div class="profile-item">
+                  <span class="p-label">MVIC Baseline Force (IR):</span>
+                  <span class="p-val">245.8 N</span>
+                </div>
+                <div class="profile-item">
+                  <span class="p-label">MVIC Baseline Force (ER):</span>
+                  <span class="p-val">198.4 N</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-card margin-top">
+              <div class="chart-header">
+                <div>
+                  <h3>Personalized vs Generic Population Model Accuracy</h3>
+                  <p class="chart-sub">LOSO Cross-Validation RMSE by Subject across 34 participants</p>
+                </div>
+              </div>
+              <div class="chart-container" style="height: 320px;">
+                <canvas id="losoComparisonChart"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 5: AGENTS -->
+          <section id="tab-agents" class="tab-content">
+            <div class="split-view">
+              <div class="card flex-1">
+                <div class="chart-header">
+                  <div>
+                    <h3>Autonomous Agentic Oversight System</h3>
+                    <p class="chart-sub">Real-time fatigue monitoring loop & safety decision engine</p>
+                  </div>
+                  <div class="badge badge-success">Agent Swarm Active</div>
+                </div>
+
+                <div class="agent-controls">
+                  <div class="control-box">
+                    <label>Agent Alert Threshold (Borg RPE):</label>
+                    <input type="range" id="alertThreshold" min="12" max="18" value="15" step="0.5">
+                    <span id="thresholdVal">15.0 (Hard Exertion)</span>
+                  </div>
+                  <button class="btn btn-primary" id="triggerAgentCheck">Run Agent Loop Cycle</button>
+                </div>
+
+                <div class="agent-log-box" id="agentLogs">
+                  <!-- Logs dynamically inserted -->
+                </div>
+              </div>
+
+              <div class="card" style="width: 320px;">
+                <h3>Active AI Agents</h3>
+                <div class="agent-list">
+                  <div class="agent-status-card active">
+                    <div class="agent-name">🛡️ Safety Sentinel Agent</div>
+                    <p class="agent-role">Monitors IMU tremor & EMG spectral drop for over-exertion risk.</p>
+                    <span class="badge badge-success">Running</span>
+                  </div>
+                  <div class="agent-status-card active">
+                    <div class="agent-name">📊 Personalization Agent</div>
+                    <p class="agent-role">Dynamically shifts feature weights based on Subject P03 arm length.</p>
+                    <span class="badge badge-success">Running</span>
+                  </div>
+                  <div class="agent-status-card active">
+                    <div class="agent-name">💡 Explanation Synthesizer</div>
+                    <p class="agent-role">Generates plain-language medical narratives from SHAP values.</p>
+                    <span class="badge badge-purple">Idle</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
