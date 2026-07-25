@@ -7,12 +7,16 @@ seaborn
 scikit-learn
 joblib
 
-# Phase 9: baseline modeling
-# torch
+# Deep Learning & Modeling
+torch
 # xgboost
 
-# Phase 11: explainability
-# shap
+# Explainability
+shap
+
+# Backend & API
+fastapi
+uvicorn
 
 # Testing
 pytest

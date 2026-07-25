@@ -327,12 +327,53 @@ function initAgentLoop() {
   addLog('SENTINEL', 'tag-sentinel', 'System initialized. Baseline Borg RPE: 6.0. Monitoring 6 EMG & 6 IMU streams.');
   addLog('PERSONAL', 'tag-personal', 'Loaded Subject P03 profile (Male, 26y, 183cm, UpperArm: 34.2cm). LOSO adaptor active.');
 
-  triggerBtn.addEventListener('click', () => {
+  triggerBtn.addEventListener('click', async () => {
     const currentRpe = parseFloat(document.getElementById('currentRpe').textContent);
     const threshold = parseFloat(slider.value);
+    const subjectId = document.getElementById('subjectSelect')?.value || 'P03';
 
     addLog('SENTINEL', 'tag-sentinel', `Agent cycle triggered. Evaluated RPE: ${currentRpe} against threshold: ${threshold}`);
 
+    try {
+      // Call FastAPI Multi-Agent Orchestrator REST Endpoint
+      const response = await fetch('http://127.0.0.1:8000/api/agents/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject_id: subjectId,
+          predicted_rpe: currentRpe,
+          shap_values: {
+            "EMG_MDF_AntDeltoid": 3.20,
+            "IMU_Jerk_UpperArm": 1.80,
+            "PPG_HeartRate": -0.40,
+            "EMG_RMS_Infraspinatus": 1.15
+          }
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const pipeline = result.agent_pipeline_results;
+
+        if (pipeline.data_agent) {
+          addLog('SENTINEL', 'tag-sentinel', `DataIntelligenceAgent: ${pipeline.data_agent.narrative}`);
+        }
+        if (pipeline.personalization_agent) {
+          addLog('PERSONAL', 'tag-personal', `PersonalizationAgent: ${pipeline.personalization_agent.narrative}`);
+        }
+        if (pipeline.explainability_agent) {
+          addLog('EXPLAIN', 'tag-explain', `ExplainabilityAgent: ${pipeline.explainability_agent.narrative}`);
+        }
+        if (pipeline.decision_agent) {
+          addLog('DECISION', 'tag-sentinel', `DecisionAndReportingAgent: ${pipeline.decision_agent.narrative}`);
+        }
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend API offline, falling back to local client simulation.', err);
+    }
+
+    // Local fallback if API is not running
     if (currentRpe >= threshold) {
       addLog('SENTINEL', 'tag-sentinel', `⚠️ ALERT: Borg RPE (${currentRpe}) exceeded threshold (${threshold})! Muscle fatigue shift detected.`);
       addLog('EXPLAIN', 'tag-explain', 'SHAP Analysis: Ant. Deltoid MDF dropped -24.5Hz (Impact: +3.2 RPE). Recommending 60s rest interval.');
