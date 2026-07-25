@@ -38,6 +38,8 @@ This framework addresses all three requirements in a single, cohesive pipeline: 
 | Subject-Aware Evaluation | Every data split — cross-validation, train/validation/test, and LOSO — is grouped by subject to prevent leakage across correlated windows. |
 | Modular Architecture | Typed, dataclass-driven components with a consistent configuration pattern, independently reusable across the pipeline. |
 | Reproducible Reporting | Every analysis stage produces a Markdown report with figures, generated directly from a runnable script rather than written by hand. |
+| Agentic Orchestration | Four coordinated agents — data intelligence, personalization, explainability, and decision/reporting — synthesize model output into a narrative fatigue assessment and safety recommendation. |
+| REST API & Dashboard | A FastAPI backend exposes subject, signal, and agent-analysis endpoints; a browser dashboard visualizes multimodal signals, predictions, explanations, and the agent pipeline. |
 
 ## Architecture
 
@@ -52,7 +54,7 @@ flowchart TD
     E --> F[Multimodal Attention Model]
     F --> G[Explainability<br/>SHAP & Attention Analysis]
     G --> H[Personalization<br/>LOSO & Subject Profiles]
-    H --> I["Agentic AI (Planned)"]
+    H --> I[Agentic AI Orchestration]
     I --> J[Fatigue Report]
 ```
 
@@ -77,8 +79,10 @@ Agentic-Fatigue-Fingerprinting/
 ├── reports/                   Generated Markdown reports and figures
 ├── docs/                      Design-rationale documentation per module
 ├── tests/                     Unit test suite (pytest)
-├── backend/                   Planned: API, services, database, agentic components
-├── dashboard/                 Planned: interactive visualization frontend
+├── backend/
+│   ├── agents/                 Data Intelligence, Personalization, Explainability, and Decision/Reporting agents + orchestrator
+│   └── api/                    FastAPI REST API serving agent analysis, subject profiles, and signal streams
+├── dashboard/                 Vite-based browser dashboard for signals, predictions, explainability, and the agent control loop
 ├── datasets/                  Raw and processed data (not version-controlled)
 └── assets/                    Diagrams and images
 ```
@@ -128,18 +132,36 @@ Population-level models generalize on average but miss individual variability in
 
 ## Agentic AI Architecture
 
-**Planned.** The agents below describe the orchestration layer this framework is designed to support, built on top of the modeling, explainability, and personalization modules described above. They are not yet implemented.
+A four-agent orchestration layer coordinates the modeling, explainability, and personalization modules into a single fatigue assessment.
 
 | Agent | Responsibility |
 |---|---|
-| Data Intelligence Agent | Orchestrates data ingestion, preprocessing, and feature extraction, and flags signal-quality issues before they reach modeling. |
-| Explainability Agent | Generates and interprets SHAP and attention-based explanations, translating raw attributions into human-readable rationale. |
-| Personalization Agent | Maintains subject profiles, applies LOSO-informed personalization, and reasons over subject similarity to contextualize an individual's result. |
-| Decision and Reporting Agent | Synthesizes model output, explanation, and personalization context into a final fatigue assessment and narrative report. |
+| Data Intelligence Agent | Audits incoming multimodal signal streams for missing channels, NaN/Inf artifacts, and packet loss before they reach modeling. |
+| Personalization Agent | Applies subject-specific baseline adjustments — anthropometrics, MVIC strength — to a population-level prediction. |
+| Explainability Agent | Translates SHAP feature-attribution vectors into a ranked, human-readable narrative of the primary fatigue drivers. |
+| Decision and Reporting Agent | Enforces a safety policy over the final fatigue estimate and synthesizes every upstream agent's output into one Markdown report. |
+
+`AgentOrchestrator` runs the four agents sequentially — Data Intelligence → Personalization → Explainability → Decision and Reporting — short-circuiting straight to a warning report if the Data Intelligence Agent rejects the input signal.
+
+*Current scope:* the agents are fully implemented and tested, and run end-to-end over representative example data (a fixed subject-profile table and illustrative SHAP values) to demonstrate the orchestration pipeline. Wiring them to live inference from the trained models described above is ongoing work.
+
+### REST API & Dashboard
+
+A FastAPI backend exposes the agent pipeline and serves the browser dashboard:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | Service status and active agent/subject counts |
+| `GET /api/subjects` | Metadata for all participant profiles |
+| `GET /api/subjects/{id}` | Detailed profile for one participant |
+| `GET /api/signals/stream/{id}` | Synchronized EMG/IMU/PPG signal snapshot |
+| `POST /api/agents/analyze` | Runs the full 4-agent pipeline and returns the assessment |
+
+The dashboard (`dashboard/`, built with Vite) visualizes multimodal signals, model predictions, SHAP explanations, personalization/LOSO results, and the live agent control loop.
 
 ## Installation
 
-Requires Python 3.10 or later.
+Requires Python 3.10 or later (and Node.js 18+ if you want to build the dashboard from source).
 
 ```bash
 git clone https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting.git
@@ -172,6 +194,12 @@ python notebooks/phase12_personalization_report.py
 
 # Run the test suite
 python -m pytest tests/ -v
+
+# Start the REST API (also serves the dashboard at /dashboard)
+uvicorn backend.api.app:app --reload
+
+# Or run the dashboard separately in development mode
+cd dashboard && npm install && npm run dev
 ```
 
 ### Example Workflow
@@ -196,18 +224,19 @@ A raw EMG, IMU, or PPG window is scored by a trained model, explained through SH
 | Explainable AI | SHAP |
 | Data Processing | NumPy, SciPy, pandas |
 | Visualization | Matplotlib, Seaborn |
+| Backend API | FastAPI, Uvicorn, Pydantic |
+| Frontend | Vite, Chart.js |
 | Testing | pytest |
 | Version Control | Git, GitHub |
 
 ## Future Enhancements
 
+- Wiring the agentic layer to live inference from the trained models, replacing the current example-data pipeline
 - Real-time wearable device integration
 - Edge deployment for on-device inference
 - Clinical validation studies
 - Federated learning across institutions
 - Companion mobile application
-- Full implementation of the agentic orchestration layer
-- Interactive visualization dashboard
 
 ## Contributing
 
