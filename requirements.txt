@@ -11,5 +11,8 @@ joblib
 torch
 xgboost
 
+# Phase 11: explainability
+shap
+
 # Testing
 pytest
