@@ -161,45 +161,109 @@ The dashboard (`dashboard/`, built with Vite) visualizes multimodal signals, mod
 
 ## Installation
 
-Requires Python 3.10 or later (and Node.js 18+ if you want to build the dashboard from source).
+**Prerequisites**
+
+| Requirement | Needed for |
+|---|---|
+| Python 3.10+ | The ML pipeline, explainability, personalization, and API modules |
+| Node.js 18+ | Building the dashboard from source (optional — the API serves a prebuilt version) |
+| Git | Cloning the repository |
+
+**1. Clone the repository**
 
 ```bash
 git clone https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting.git
 cd Agentic-Fatigue-Fingerprinting
+```
 
+**2. Create and activate a virtual environment**
+
+```bash
 python -m venv venv
-source venv/bin/activate      # On Windows: venv\Scripts\activate
+```
 
+```bash
+# macOS / Linux
+source venv/bin/activate
+
+# Windows (PowerShell)
+venv\Scripts\Activate.ps1
+
+# Windows (Command Prompt)
+venv\Scripts\activate.bat
+```
+
+**3. Install Python dependencies**
+
+```bash
 pip install -r requirements.txt
 ```
 
-Download the [WSD4FEDSRM dataset](https://zenodo.org/records/8415066) and extract it to `datasets/raw/WSD4FEDSRM/`.
+**4. Download the dataset**
+
+Download [WSD4FEDSRM](https://zenodo.org/records/8415066) from Zenodo and extract it so the raw files live at:
+
+```
+datasets/raw/WSD4FEDSRM/
+```
+
+**5. Verify the installation**
+
+```bash
+python -m pytest tests/ -v
+```
+
+All tests should pass. If they do, the environment is ready.
 
 ## Usage
 
-Each pipeline stage is exposed as a reusable Python module under `ml/`, with a runnable, reproducible entry point under `notebooks/`. Running a script loads and preprocesses the raw sensor data, extracts and validates features, trains or reloads the relevant model, and writes a Markdown report with figures to `reports/`. No report is written by hand — each is the direct, reproducible output of its corresponding script.
+The framework has two independent ways to run: a command-line **ML pipeline** that regenerates reports and figures, and a live **REST API + dashboard** that serves the agentic layer interactively. You do not need to run one to use the other.
+
+### 1. Run the ML pipeline (reports & figures)
+
+Each stage is a standalone script under `notebooks/`. Running one loads and preprocesses the raw sensor data, extracts and validates features, trains or reloads the relevant model, and writes a Markdown report with figures to `reports/`. No report is written by hand — each is the direct, reproducible output of its script.
 
 ```bash
-# Load the raw dataset into the typed object model
+# Step 1 — Load the raw dataset into the typed object model
 python -m ml.preprocessing.dataset_loader
 
-# Run the baseline modeling pipeline
+# Step 2 — Run the baseline modeling pipeline (classical + deep learning)
 python notebooks/phase9_baseline_models_report.py
 
-# Run the explainability pipeline
+# Step 3 — Run the explainability pipeline (SHAP + attention analysis)
 python notebooks/phase11_explainability_report.py
 
-# Run the personalization pipeline
+# Step 4 — Run the personalization pipeline (LOSO + subject profiles)
 python notebooks/phase12_personalization_report.py
+```
 
-# Run the test suite
-python -m pytest tests/ -v
+Each command prints its progress to the terminal. When it finishes, check `reports/` for the new Markdown report and `reports/figures/` for its plots.
 
-# Start the REST API (also serves the dashboard at /dashboard)
+### 2. Run the REST API & dashboard (live agentic layer)
+
+```bash
 uvicorn backend.api.app:app --reload
+```
 
-# Or run the dashboard separately in development mode
-cd dashboard && npm install && npm run dev
+Once running:
+- API root: `http://127.0.0.1:8000`
+- Interactive API docs (Swagger UI): `http://127.0.0.1:8000/docs`
+- Dashboard: `http://127.0.0.1:8000/dashboard`
+
+To work on the dashboard's frontend code directly, run it as a separate dev server with hot reload instead (it still expects the API above to be running):
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+Vite prints the local dev URL in the terminal (typically `http://localhost:5173`).
+
+### Run the test suite
+
+```bash
+python -m pytest tests/ -v
 ```
 
 ### Example Workflow
