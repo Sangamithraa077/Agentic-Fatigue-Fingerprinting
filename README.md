@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏃 Athlete Intelligence
+# Athlete Intelligence
 
 ### Understand. Predict. Perform.
 
@@ -37,35 +37,35 @@ It's built for anyone who needs to understand fatigue as it happens, not after t
 
 | Who | What they get |
 |---|---|
-| 🏋️ **Athletes** | A live, honest read on how their body is handling a session — not just a number, but *why*. |
-| 🧑‍🏫 **Coaches & trainers** | An AI assistant that flags rising fatigue risk before it becomes an injury. |
-| 🩺 **Clinicians & ergonomists** | Objective, explainable fatigue signal for occupational and rehab settings. |
-| 🔬 **Researchers** | A full, reproducible ML pipeline — preprocessing through personalization — built on real wearable sensor data. |
-| 💻 **Engineers** | A reference architecture for explainable, personalized, agent-orchestrated biomedical time-series AI. |
+| **Athletes** | A live, honest read on how their body is handling a session — not just a number, but *why*. |
+| **Coaches & trainers** | An AI assistant that flags rising fatigue risk before it becomes an injury. |
+| **Clinicians & ergonomists** | Objective, explainable fatigue signal for occupational and rehab settings. |
+| **Researchers** | A full, reproducible ML pipeline — preprocessing through personalization — built on real wearable sensor data. |
+| **Engineers** | A reference architecture for explainable, personalized, agent-orchestrated biomedical time-series AI. |
 
 Every number on the dashboard is real. There is no synthetic data, no mocked prediction, and no fallback simulation anywhere in the live product — if the backend is unreachable, the interface says so, honestly, instead of making something up.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 **AI & Machine Learning**
-- 🧠 Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) fatigue models, benchmarked under one identical, leakage-safe evaluation protocol
-- 🔀 A multimodal cross-modal attention architecture that fuses EMG, IMU, and PPG into a single shared representation
-- 🔍 SHAP-based explainability — global and local feature attribution, with automatic explainer selection per model family
-- 👤 Personalization layer — Leave-One-Subject-Out evaluation and subject-specific baseline adjustment, so the model adapts to *this* athlete, not just "the average one"
-- 🤖 A 4-agent orchestration layer (Data Intelligence, Personalization, Explainability, Decision & Reporting) that synthesizes every stage above into one coaching recommendation
+- Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) fatigue models, benchmarked under one identical, leakage-safe evaluation protocol
+- A multimodal cross-modal attention architecture that fuses EMG, IMU, and PPG into a single shared representation
+- SHAP-based explainability — global and local feature attribution, with automatic explainer selection per model family
+- Personalization layer — Leave-One-Subject-Out evaluation and subject-specific baseline adjustment, so the model adapts to *this* athlete, not just "the average one"
+- A 4-agent orchestration layer (Data Intelligence, Personalization, Explainability, Decision & Reporting) that synthesizes every stage above into one coaching recommendation
 
 **Live Product**
-- 📡 Real-time signal replay engine — streams an athlete's actual recorded session progressively, exactly as if a live sensor were attached, with the architecture already designed as a drop-in seam for a real sensor later
-- 💬 **AI Coach** — a structured recommendation (Priority · Confidence · Recovery Outlook · Suggested Action) built directly from real agent output, not a canned response
-- 🌗 Dark & light themes, fully re-tinted design system, persisted per user
-- 📊 Live-updating charts, HUD-style performance rings, and a skill radar — all driven by the same real payload, perfectly in sync across every tab
-- ♿ Accessible by default — focus states, `aria-live` regions, reduced-motion support
+- Real-time signal replay engine — streams an athlete's actual recorded session progressively, exactly as if a live sensor were attached, with the architecture already designed as a drop-in seam for a real sensor later
+- **AI Coach** — a structured recommendation (Priority · Confidence · Recovery Outlook · Suggested Action) built directly from real agent output, not a canned response
+- Dark & light themes, fully re-tinted design system, persisted per user
+- Live-updating charts, HUD-style performance rings, and a skill radar — all driven by the same real payload, perfectly in sync across every tab
+- Accessible by default — focus states, `aria-live` regions, reduced-motion support
 
 ---
 
-## 🖥️ Dashboard Showcase
+## Dashboard Showcase
 
 The dashboard is organized around one continuous story — not five disconnected screens:
 
@@ -79,11 +79,11 @@ The dashboard is organized around one continuous story — not five disconnected
 
 A persistent hero strip keeps **Performance**, **Fatigue Status**, and the latest **AI Recommendation** visible no matter which tab is open, so the athlete's current state is never more than a glance away.
 
-> 📸 **Screenshots**: this repository ships without pre-rendered screenshots (`assets/images/` is present but empty by design — nothing here is stock photography). Run the dashboard locally (see [Installation](#-installation)) to see it live in under five minutes, or drop your own captures into `assets/images/` and link them here.
+> **Screenshots**: this repository ships without pre-rendered screenshots (`assets/images/` is present but empty by design — nothing here is stock photography). Run the dashboard locally (see [Installation](#installation)) to see it live in under five minutes, or drop your own captures into `assets/images/` and link them here.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -129,7 +129,7 @@ Each stage is independently reusable: a model can be explained without retrainin
 
 ---
 
-## 🔄 AI Pipeline
+## AI Pipeline
 
 The exact flow a single window of sensor data travels, from raw recording to a coaching recommendation on screen:
 
@@ -157,7 +157,7 @@ flowchart LR
 
 ---
 
-## 🤖 Agent Framework
+## Agent Framework
 
 | Agent | Responsibility |
 |---|---|
@@ -172,7 +172,7 @@ The agents run against **live inference from the real trained model and replay e
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Agentic-Fatigue-Fingerprinting/
@@ -203,7 +203,7 @@ Agentic-Fatigue-Fingerprinting/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 **Prerequisites**
 
@@ -258,7 +258,7 @@ All 292 tests should pass — if they do, the environment is ready.
 
 ---
 
-## ▶️ Running the Backend
+## Running the Backend
 
 ```bash
 uvicorn backend.api.app:app --reload
@@ -272,7 +272,7 @@ uvicorn backend.api.app:app --reload
 
 The backend also serves the dashboard directly — you don't need Node.js installed just to use the product.
 
-## ▶️ Running the Dashboard (frontend dev mode)
+## Running the Dashboard (frontend dev mode)
 
 Only needed if you're actively editing the dashboard's frontend code and want hot reload:
 
@@ -292,7 +292,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 🎬 Demo
+## Demo
 
 There's no hosted demo — the product replays real, non-public sensor recordings, so the honest way to see it is to run it yourself:
 
@@ -306,7 +306,7 @@ First load for a given athlete takes up to about a minute — that's the real pr
 
 ---
 
-## 📊 Dataset
+## Dataset
 
 Built and validated on **WSD4FEDSRM** — *Wearable Sensor Data for Fatigue Estimation during Shoulder Rotation Movements*.
 
@@ -317,7 +317,7 @@ Built and validated on **WSD4FEDSRM** — *Wearable Sensor Data for Fatigue Esti
 
 ---
 
-## 🧪 Model Details
+## Model Details
 
 Four classical and four deep learning models were benchmarked under one identical, group-aware (subject-level) evaluation protocol on EMG features, binary fatigue classification:
 
@@ -325,18 +325,18 @@ Four classical and four deep learning models were benchmarked under one identica
 |---|---|---|---|---|
 | Logistic Regression | classical | 0.560 | 0.570 | 0.540 |
 | SVM | classical | 0.588 | 0.563 | 0.547 |
-| **Random Forest** ⭐ | classical | 0.625 | 0.586 | 0.561 |
+| **Random Forest** | classical | 0.625 | 0.586 | 0.561 |
 | XGBoost | classical | 0.664 | 0.598 | 0.535 |
 | 1D-CNN | deep learning | 0.660 | 0.574 | 0.479 |
 | BiLSTM | deep learning | 0.659 | 0.568 | 0.487 |
 | CNN-BiLSTM | deep learning | 0.660 | 0.575 | 0.449 |
 | TCN | deep learning | 0.672 | 0.604 | 0.536 |
 
-⭐ **Random Forest is the model actually deployed** in the live dashboard and agent pipeline — chosen for its exact SHAP `TreeExplainer` compatibility, which keeps every explanation shown to an athlete mathematically exact rather than approximated. Full methodology, all feature-subset comparisons, and figures are in [`reports/baseline_models_report.md`](reports/baseline_models_report.md).
+**Random Forest is the model actually deployed** in the live dashboard and agent pipeline — chosen for its exact SHAP `TreeExplainer` compatibility, which keeps every explanation shown to an athlete mathematically exact rather than approximated. Full methodology, all feature-subset comparisons, and figures are in [`reports/baseline_models_report.md`](reports/baseline_models_report.md).
 
 ---
 
-## 🔍 Explainability
+## Explainability
 
 | Technique | Purpose |
 |---|---|
@@ -349,7 +349,7 @@ In the dashboard, this becomes the **AI Insights** tab: plain-language "what inf
 
 ---
 
-## 👤 Personalization
+## Personalization
 
 | Capability | Description |
 |---|---|
@@ -362,7 +362,7 @@ In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Popul
 
 ---
 
-## 🔮 Future Scope
+## Future Scope
 
 - Real-time physical wearable device integration (the replay engine is already architected as the exact seam this would plug into — see its module docstring)
 - Edge deployment for on-device inference
@@ -373,7 +373,7 @@ In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Popul
 
 ---
 
-## 🧾 Technology Stack
+## Technology Stack
 
 | Category | Tools |
 |---|---|
@@ -390,7 +390,7 @@ In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Popul
 
 ---
 
-## 📚 Documentation Index
+## Documentation Index
 
 Design-rationale documentation for individual modules lives in [`docs/`](docs/):
 
@@ -412,7 +412,7 @@ Contributions are welcome.
 
 For substantial changes, please open an issue first to discuss direction.
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 - The **WSD4FEDSRM** dataset authors, for a genuinely rare public dataset combining EMG, IMU, and PPG against a real exhaustion protocol
 - The open-source maintainers of **FastAPI**, **PyTorch**, **scikit-learn**, **SHAP**, **Chart.js**, and **Lucide** — this project stands on their work
