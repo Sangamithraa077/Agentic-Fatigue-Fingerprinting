@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 # Add project root directory to sys.path
 project_root = str(Path(__file__).resolve().parents[2])
@@ -12,12 +12,14 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import numpy as np
-from fastapi import FastAPI, HTTPException  # type: ignore
+from fastapi import FastAPI  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.staticfiles import StaticFiles  # type: ignore
 from pydantic import BaseModel, Field  # type: ignore
 
 from backend.agents.orchestrator import AgentOrchestrator
+from backend.api.replay_routes import router as replay_router
+from backend.services import replay_engine
 
 app = FastAPI(
     title="Agentic Fatigue Fingerprinting API",
@@ -34,91 +36,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(replay_router)
+
 # Mount Dashboard Static Files
 dashboard_dir = Path(__file__).resolve().parents[2] / "dashboard"
 if dashboard_dir.exists():
     app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
-# Global Agent Orchestrator instance
-orchestrator = AgentOrchestrator()
-
-# Subject Profiles Database Mock (derived from WSD4FEDSRM metadata)
-SUBJECT_PROFILES: Dict[str, Dict[str, Any]] = {
-    "P01": {
-        "subject_id": "P01",
-        "sex": "Female",
-        "age": 31,
-        "height_cm": 165.0,
-        "weight_kg": 58.0,
-        "upperarm_length_cm": 31.5,
-        "mvic_force_n": 185.0,
-        "dominant_hand": "Right",
-    },
-    "P02": {
-        "subject_id": "P02",
-        "sex": "Female",
-        "age": 23,
-        "height_cm": 168.0,
-        "weight_kg": 61.0,
-        "upperarm_length_cm": 32.0,
-        "mvic_force_n": 192.0,
-        "dominant_hand": "Right",
-    },
-    "P03": {
-        "subject_id": "P03",
-        "sex": "Male",
-        "age": 26,
-        "height_cm": 178.0,
-        "weight_kg": 74.0,
-        "upperarm_length_cm": 34.2,
-        "mvic_force_n": 240.0,
-        "dominant_hand": "Right",
-    },
-    "P04": {
-        "subject_id": "P04",
-        "sex": "Male",
-        "age": 25,
-        "height_cm": 181.0,
-        "weight_kg": 79.0,
-        "upperarm_length_cm": 35.0,
-        "mvic_force_n": 255.0,
-        "dominant_hand": "Right",
-    },
-    "P05": {
-        "subject_id": "P05",
-        "sex": "Female",
-        "age": 21,
-        "height_cm": 162.0,
-        "weight_kg": 54.0,
-        "upperarm_length_cm": 30.8,
-        "mvic_force_n": 175.0,
-        "dominant_hand": "Right",
-    },
-    "P06": {
-        "subject_id": "P06",
-        "sex": "Male",
-        "age": 26,
-        "height_cm": 175.0,
-        "weight_kg": 71.0,
-        "upperarm_length_cm": 33.5,
-        "mvic_force_n": 225.0,
-        "dominant_hand": "Right",
-    },
-}
-
 
 class AnalysisRequest(BaseModel):
-    subject_id: str = Field(default="P03", description="Subject identifier (e.g., P01 to P34)")
-    predicted_rpe: Optional[float] = Field(default=16.4, description="Raw model predicted Borg RPE score")
-    shap_values: Optional[Dict[str, float]] = Field(
-        default={
-            "EMG_MDF_AntDeltoid": 3.20,
-            "IMU_Jerk_UpperArm": 1.80,
-            "PPG_HeartRate": -0.40,
-            "EMG_RMS_Infraspinatus": 1.15,
-        },
-        description="Feature attribution values from SHAP explainer",
-    )
+    """Request body for `/api/agents/analyze`.
+
+    `predicted_rpe` and `shap_values` are only used as a fallback when
+    `subject_id`/`step` do not resolve to an already-built replay session
+    (see `run_agent_analysis`) -- whenever a session is available, the
+    endpoint recomputes both from the real trained model and SHAP
+    explainer itself, rather than trusting client-supplied numbers.
+    """
+
+    subject_id: str = Field(default="P01", description="Subject identifier (e.g., P01 to P34)")
+    step: Optional[int] = Field(default=None, description="Replay step index this analysis corresponds to")
+    threshold: float = Field(default=15.0, description="Borg RPE proxy threshold the Decision and Reporting Agent applies for this request")
+    predicted_rpe: Optional[float] = Field(default=None, description="Fallback Borg RPE proxy, used only if no replay session is available")
+    shap_values: Optional[Dict[str, float]] = Field(default=None, description="Fallback SHAP attributions, used only if no replay session is available")
 
 
 @app.get("/api/health")
@@ -129,78 +69,65 @@ def health_check():
         "framework": "Agentic Fatigue Fingerprinting",
         "dataset": "WSD4FEDSRM",
         "agents_active": 4,
-        "active_subjects": len(SUBJECT_PROFILES),
-    }
-
-
-@app.get("/api/subjects")
-def get_subjects():
-    """Returns metadata for all available participant profiles."""
-    return {"subjects": list(SUBJECT_PROFILES.values())}
-
-
-@app.get("/api/subjects/{subject_id}")
-def get_subject_detail(subject_id: str):
-    """Returns detailed demographic and baseline profile for a specific participant."""
-    if subject_id not in SUBJECT_PROFILES:
-        raise HTTPException(status_code=404, detail=f"Subject '{subject_id}' not found.")
-    return SUBJECT_PROFILES[subject_id]
-
-
-@app.get("/api/signals/stream/{subject_id}")
-def get_signal_stream(subject_id: str):
-    """Generates a snapshot of synchronized 3-modality sensor streams for visualization."""
-    if subject_id not in SUBJECT_PROFILES:
-        subject_id = "P03"
-
-    # Generate synchronized synthetic streams for dashboard preview
-    np.random.seed(hash(subject_id) % 2**32)
-    t_emg = np.linspace(0, 1, 1000).tolist()
-    t_imu = np.linspace(0, 1, 100).tolist()
-    t_ppg = np.linspace(0, 1, 200).tolist()
-
-    # EMG signal with fatigue tremor burst
-    emg_signal = (0.3 * np.sin(2 * np.pi * 50 * np.array(t_emg)) + 0.1 * np.random.randn(1000)).tolist()
-    
-    # IMU tri-axial acceleration
-    imu_acc_x = (9.81 + 0.5 * np.sin(2 * np.pi * 1.5 * np.array(t_imu))).tolist()
-    imu_acc_y = (0.2 * np.cos(2 * np.pi * 1.5 * np.array(t_imu))).tolist()
-    imu_acc_z = (0.1 * np.random.randn(100)).tolist()
-
-    # PPG pulse wave
-    ppg_bvp = (0.8 * np.sin(2 * np.pi * 2.0 * np.array(t_ppg)) + 0.2 * np.sin(2 * np.pi * 4.0 * np.array(t_ppg))).tolist()
-
-    return {
-        "subject_id": subject_id,
-        "emg": {"timestamps": t_emg, "values": emg_signal, "sampling_rate_hz": 1000, "channel": "Ant. Deltoid"},
-        "imu": {"timestamps": t_imu, "acc_x": imu_acc_x, "acc_y": imu_acc_y, "acc_z": imu_acc_z, "sampling_rate_hz": 100},
-        "ppg": {"timestamps": t_ppg, "values": ppg_bvp, "sampling_rate_hz": 200},
+        "active_subjects": len(replay_engine.list_available_subjects()),
     }
 
 
 @app.post("/api/agents/analyze")
 def run_agent_analysis(req: AnalysisRequest):
-    """Executes the full 4-agent orchestration workflow on the provided request context."""
-    subject_info = SUBJECT_PROFILES.get(req.subject_id, SUBJECT_PROFILES["P03"])
+    """Executes the full 4-agent orchestration workflow.
 
-    # Create mock raw signals for DataIntelligenceAgent check
-    context = {
-        "subject_id": req.subject_id,
-        "subject_profile": subject_info,
-        "population_rpe": req.predicted_rpe or 16.4,
-        "predicted_rpe": req.predicted_rpe or 16.4,
-        "shap_values": req.shap_values or {},
-        "raw_signals": {
-            "emg": np.random.randn(1000, 6),
-            "imu": np.random.randn(100, 6),
-            "ppg": np.random.randn(200, 1),
-        },
+    When `req.step` is given and the subject's replay session is already
+    cached (i.e. the dashboard has an active replay stream open for this
+    subject), the analysis context -- signals, predicted fatigue estimate,
+    SHAP attributions, subject profile -- is recomputed directly from that
+    real session rather than taken from the request body.
+    """
+    subject_profile: Dict[str, float] = {}
+    predicted_rpe = req.predicted_rpe or 16.4
+    shap_values = req.shap_values or {}
+    raw_signals = {
+        "emg": np.zeros((1000, 3)),
+        "imu": np.zeros((100, 3)),
+        "ppg": np.zeros((200, 1)),
     }
 
-    # Run complete multi-agent pipeline
-    agent_results = orchestrator.analyze_fatigue(context)
+    session = replay_engine.get_cached_session(req.subject_id) if req.step is not None else None
+    if session is not None:
+        step_data = replay_engine.compute_replay_step(session, req.step)
 
-    # Format output for frontend dashboard consumption
+        predicted_rpe = step_data["prediction"]["estimated_rpe_proxy"]
+        shap_values = {f["feature"]: f["shap"] for f in step_data["explainability"]["local_top_features"]}
+        profile = step_data["personalization"]["profile"]
+        subject_profile = {
+            "sex": (profile["demographic"] or {}).get("sex", "unknown"),
+            "age": (profile["demographic"] or {}).get("age", 0),
+            "upperarm_length_cm": 0.0,
+            "mvic_force_n": (profile["mvic"] or {}).get("er_mean_n", 0.0),
+        }
+
+        emg = step_data["signals"]["emg"]["channels"]
+        emg_arrays = [v for v in emg.values() if v]
+        if emg_arrays:
+            raw_signals["emg"] = np.array(emg_arrays).T
+        imu = step_data["signals"]["imu"]
+        if "acc_x" in imu:
+            raw_signals["imu"] = np.array([imu["acc_x"], imu["acc_y"], imu["acc_z"]]).T
+        ppg = step_data["signals"]["ppg"]
+        if ppg and ppg.get("values"):
+            raw_signals["ppg"] = np.array(ppg["values"]).reshape(-1, 1)
+
+    context = {
+        "subject_id": req.subject_id,
+        "subject_profile": subject_profile,
+        "population_rpe": predicted_rpe,
+        "predicted_rpe": predicted_rpe,
+        "shap_values": shap_values,
+        "raw_signals": raw_signals,
+    }
+
+    agent_results = AgentOrchestrator(rpe_warning_threshold=req.threshold).analyze_fatigue(context)
+
     formatted_results = {}
     for agent_name, res in agent_results.items():
         formatted_results[agent_name] = {
