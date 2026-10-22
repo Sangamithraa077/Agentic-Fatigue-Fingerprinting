@@ -27,6 +27,7 @@ Raw `ml.data_models` objects (`Dataset`/`Subject`/`Condition`/`EMGData`/...) are
 | `ppg_preprocessor.py` | PPG-specific transforms + `PPGPreprocessor` + `PPGPreprocessingConfig`. |
 | `preprocessing_results.py` | Output dataclasses (`ProcessedEMGData`, `ProcessedIMUData`, `ProcessedPPGData`, `ProcessedCondition`, `ProcessedSubject`, `PreprocessingSummary`). |
 | `pipeline.py` | `PreprocessingPipeline` orchestrator, accepting a `Subject` or `Condition` and producing the corresponding `Processed*` object plus a running `PreprocessingSummary`. |
+| `augmentation.py` | `TrainingDataAugmenter` and `AugmentationConfig` for in-memory signal jittering, magnitude scaling, and time warping during model training. |
 
 ## EMG Preprocessing (1000 Hz)
 
@@ -58,6 +59,18 @@ Applied in order, toggleable via `PPGPreprocessingConfig`:
 ## Sampling Rates and Resampling
 
 EMG (1000 Hz), IMU (100 Hz), and PPG (200 Hz) are each processed at their native rate. `resampling.py` provides `resample_signal`/`align_signal_length` utilities that a modality config can opt into (`target_sampling_rate_hz`) if a future phase needs a modality resampled for its own purposes — but **no config enables this by default**, and nothing in this phase aligns modalities onto a shared timebase. That alignment is explicitly deferred to the future multimodal fusion phase.
+
+## Training Data Augmentation (In-Memory)
+
+Implemented in `ml/preprocessing/augmentation.py`:
+- **`TrainingDataAugmenter`**: Provides lightweight, time-series-aware augmentation transforms for training splits to improve model generalization and prevent overfitting:
+  - **Additive Gaussian Noise (Jitter)**: Injects small, zero-mean Gaussian perturbation proportional to standard deviation (`noise_std=0.01` default) to simulate physiological micro-variations and electrode noise.
+  - **Magnitude Scaling**: Multiplies segments by random scaling factors within `(0.95, 1.05)` to simulate slight shifts in electrode contact impedance or contraction intensity.
+  - **Time Warping**: Optional non-linear temporal stretching/compression (default off to preserve monotonic fatigue timing).
+- **Zero Disk Overhead & Zero Data Leakage**:
+  - Augmentation is executed strictly **in-memory, on-the-fly** within `train_model()` and `train_proposed_model()` right before PyTorch `DataLoader` creation.
+  - Validation, test, and held-out LOSO subject splits are **never augmented**, guaranteeing pristine and uncontaminated evaluation metrics.
+  - No separate augmented dataset files are needed or saved to disk.
 
 ## Validation
 

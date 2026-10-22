@@ -402,6 +402,7 @@ Design-rationale documentation for individual modules lives in [`docs/`](docs/):
 - [`baseline_models.md`](docs/baseline_models.md)
 - [`proposed_model.md`](docs/proposed_model.md)
 - [`explainability.md`](docs/explainability.md)
+- [`hardware_contract.md`](docs/hardware_contract.md)
 
 ## Contributing
 
