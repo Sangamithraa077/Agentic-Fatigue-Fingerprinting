@@ -382,6 +382,39 @@
                 <div class="agent-log-box" id="agentLogs">
                   <!-- Logs dynamically inserted -->
                 </div>
+
+                <!-- MODULE 12.8: RAG EXPLAIN PANEL -->
+                <div class="card margin-top" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(0, 240, 255, 0.2);">
+                  <div class="chart-header">
+                    <div>
+                      <h4 style="color: var(--color-cyan); margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <span>📚 Evidence-Grounded RAG Explanation</span>
+                        <span class="badge" style="background: rgba(0, 240, 255, 0.15); color: var(--color-cyan); font-size: 0.75rem; border: 1px solid var(--color-cyan);">[Generated Text]</span>
+                      </h4>
+                      <p class="chart-sub" style="margin: 4px 0 0 0;">Numbers verified against pipeline SessionSummary by regex guardrail (Module 10.3)</p>
+                    </div>
+                  </div>
+                  <div id="ragExplainContent" style="padding: 12px; font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; background: rgba(0,0,0,0.2); border-radius: 6px; margin-top: 10px;">
+                    <p style="margin: 0;"><em>Click 'Run Agent Loop Cycle' or select an Ask-Your-Data query below to generate a grounded explanation...</em></p>
+                  </div>
+                  <div id="ragSourceTags" style="margin-top: 8px; font-size: 0.75rem; color: #94a3b8; display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <!-- MODULE 12.10: ASK-YOUR-DATA BOX -->
+                <div class="card margin-top" style="background: rgba(15, 23, 42, 0.5);">
+                  <div class="chart-header">
+                    <h4 style="margin: 0; font-size: 0.95rem; color: #f1f5f9;">💬 Ask-Your-Data (Read-Only Lookups)</h4>
+                  </div>
+                  <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <input type="text" id="askDataInput" placeholder="e.g. Why did fatigue increase? What is the MDF drop?" style="flex: 1; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #f8fafc; font-size: 0.85rem;">
+                    <button class="btn btn-primary" id="askDataBtn" style="padding: 8px 16px;">Ask</button>
+                  </div>
+                  <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'Why did muscle fatigue rise?'; document.getElementById('askDataBtn').click();">"Why did fatigue rise?"</button>
+                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'What does the EMG frequency drop signify?'; document.getElementById('askDataBtn').click();">"What does EMG drop mean?"</button>
+                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'How does Subject P03 arm length alter the baseline?'; document.getElementById('askDataBtn').click();">"Subject P03 baseline"</button>
+                  </div>
+                </div>
               </div>
 
               <div class="card" style="width: 320px;">

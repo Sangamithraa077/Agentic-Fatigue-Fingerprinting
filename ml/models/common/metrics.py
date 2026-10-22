@@ -18,12 +18,38 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     f1_score,
+    mean_absolute_error,
+    mean_squared_error,
     precision_score,
     recall_score,
     roc_auc_score,
 )
+from scipy.stats import pearsonr, spearmanr
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RegressionMetrics:
+    """Continuous fatigue / Borg RPE regression metrics (Module Split v2, Module 5).
+
+    Attributes:
+        mae: Mean Absolute Error (in Borg RPE points).
+        rmse: Root Mean Squared Error.
+        pearson_r: Pearson correlation coefficient with ground-truth RPE.
+        spearman_rho: Spearman rank correlation coefficient.
+        within_1_rpe: Share of predictions with absolute error <= 1.0 RPE point.
+        within_2_rpe: Share of predictions with absolute error <= 2.0 RPE points.
+        n_samples: Number of evaluated samples.
+    """
+
+    mae: float
+    rmse: float
+    pearson_r: float
+    spearman_rho: float
+    within_1_rpe: float
+    within_2_rpe: float
+    n_samples: int
 
 
 @dataclass(frozen=True)
@@ -152,3 +178,53 @@ def compute_classification_metrics(
         n_samples=len(y_true),
         n_classes=n_classes,
     )
+
+
+def compute_regression_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray
+) -> RegressionMetrics:
+    """Compute continuous Borg RPE regression metrics (MAE, RMSE, correlation, error bands).
+
+    Args:
+        y_true: (n_samples,) true continuous target values (e.g. Borg RPE 6-20).
+        y_pred: (n_samples,) predicted continuous target values.
+
+    Returns:
+        A RegressionMetrics instance.
+    """
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+
+    n_samples = len(y_true)
+    if n_samples == 0:
+        return RegressionMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
+
+    mae = float(mean_absolute_error(y_true, y_pred))
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+
+    # Correlation checks (handle zero-variance safely)
+    if np.all(y_true == y_true[0]) or np.all(y_pred == y_pred[0]) or n_samples < 2:
+        r_val = 0.0
+        rho_val = 0.0
+    else:
+        try:
+            r_val = float(pearsonr(y_true, y_pred)[0])
+            rho_val = float(spearmanr(y_true, y_pred)[0])
+        except Exception:
+            r_val = 0.0
+            rho_val = 0.0
+
+    errors = np.abs(y_true - y_pred)
+    within_1 = float(np.mean(errors <= 1.0))
+    within_2 = float(np.mean(errors <= 2.0))
+
+    return RegressionMetrics(
+        mae=mae,
+        rmse=rmse,
+        pearson_r=r_val if not np.isnan(r_val) else 0.0,
+        spearman_rho=rho_val if not np.isnan(rho_val) else 0.0,
+        within_1_rpe=within_1,
+        within_2_rpe=within_2,
+        n_samples=n_samples,
+    )
+

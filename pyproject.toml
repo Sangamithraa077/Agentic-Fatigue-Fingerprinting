@@ -11,3 +11,11 @@ extraPaths = [
     ".",
     "venv/Lib/site-packages"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    "Agentic-Fatigue-Fingerprinting",
+    "venv",
+    ".git"
+]

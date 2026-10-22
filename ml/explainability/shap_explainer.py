@@ -46,6 +46,138 @@ import matplotlib.pyplot as plt
 import numpy as np
 import shap
 
+# Patch SHAP XGBTreeModelLoader for XGBoost 3.x base_score compatibility
+try:
+    import io
+    import scipy.special
+    import xgboost as xgb
+    import shap.explainers._tree as _tree_mod
+    from shap.explainers._tree import _check_xgboost_version, decode_ubjson_buffer
+
+    _orig_loader_init = _tree_mod.XGBTreeModelLoader.__init__
+
+    def _patched_xgb_loader_init(self, xgb_model) -> None:
+        try:
+            _orig_loader_init(self, xgb_model)
+        except ValueError as err:
+            if "could not convert string to float" not in str(err):
+                raise
+            _check_xgboost_version(xgb.__version__)
+            model: xgb.Booster = xgb_model
+            raw = xgb_model.save_raw(raw_format="ubj")
+            with io.BytesIO(raw) as fd:
+                jmodel = decode_ubjson_buffer(fd)
+
+            learner = jmodel["learner"]
+            learner_model_param = learner["learner_model_param"]
+            objective = learner["objective"]
+            booster = learner["gradient_booster"]
+
+            n_classes = max(int(learner_model_param["num_class"]), 1)
+            n_targets = max(int(learner_model_param["num_target"]), 1)
+            n_targets = max(n_targets, n_classes)
+
+            if "gbtree" in booster and "model" not in booster:
+                booster = booster["gbtree"]
+            if booster["model"].get("iteration_indptr", None) is not None:
+                iteration_indptr = np.asarray(booster["model"]["iteration_indptr"], dtype=np.int32)
+                diff = np.diff(iteration_indptr)
+            else:
+                n_parallel_trees = int(booster["model"]["gbtree_model_param"]["num_parallel_tree"])
+                diff = np.repeat(n_targets * n_parallel_trees, model.num_boosted_rounds())
+
+            self.n_trees_per_iter = int(diff[0])
+            self.n_targets = n_targets
+
+            raw_bs = learner_model_param["base_score"]
+            if isinstance(raw_bs, str):
+                raw_bs = raw_bs.strip("[]")
+            self.base_score = float(raw_bs)
+
+            self.name_obj = objective["name"]
+            self.name_gbm = booster["name"]
+            base_score = float(raw_bs)
+            if self.name_obj in ("binary:logistic", "reg:logistic"):
+                self.base_score = scipy.special.logit(base_score)
+            elif self.name_obj in (
+                "reg:gamma",
+                "reg:tweedie",
+                "count:poisson",
+                "survival:cox",
+                "survival:aft",
+            ):
+                self.base_score = np.log(self.base_score)
+            else:
+                self.base_score = base_score
+
+            self.num_feature = int(learner_model_param["num_feature"])
+            self.num_class = int(learner_model_param["num_class"])
+
+            trees = booster["model"]["trees"]
+            self.num_trees = len(trees)
+
+            self.node_parents = []
+            self.node_cleft = []
+            self.node_cright = []
+            self.node_sindex = []
+            self.children_default: list[np.ndarray] = []
+            self.sum_hess = []
+            self.values = []
+            self.thresholds = []
+            self.threshold_types = []
+            self.features = []
+            self.split_types = []
+            self.categories = []
+
+            feature_types = model.feature_types
+            if feature_types is not None:
+                cat_indices = np.where(np.asarray(feature_types) == "c")[0]
+                self.cat_feature_indices = None if len(cat_indices) == 0 else cat_indices
+            else:
+                self.cat_feature_indices = None
+
+            def _to_integers(data: list[int]) -> np.ndarray:
+                return np.asanyarray(data, dtype=np.uint8)
+
+            for i in range(self.num_trees):
+                tree = trees[i]
+                parents = np.asarray(tree["parents"])
+                self.node_parents.append(parents)
+                self.node_cleft.append(np.asarray(tree["left_children"], dtype=np.int32))
+                self.node_cright.append(np.asarray(tree["right_children"], dtype=np.int32))
+                self.node_sindex.append(np.asarray(tree["split_indices"], dtype=np.uint32))
+
+                base_weight = np.asarray(tree["base_weights"], dtype=np.float32)
+                default_left = _to_integers(tree["default_left"])
+                default_child = np.where(default_left == 1, self.node_cleft[-1], self.node_cright[-1]).astype(np.int64)
+                self.children_default.append(default_child)
+                self.sum_hess.append(np.asarray(tree["sum_hessian"], dtype=np.float64))
+
+                is_leaf = self.node_cleft[-1] == -1
+                split_cond = np.asarray(tree["split_conditions"], dtype=np.float32)
+                leaf_weight = np.where(is_leaf, split_cond, 0.0)
+                thresholds = np.where(is_leaf, 0.0, split_cond)
+                thresholds = np.where(is_leaf, 0.0, np.nextafter(thresholds, -np.float32(np.inf)))
+                threshold_types = np.zeros_like(thresholds, dtype=np.int32)
+
+                self.values.append(leaf_weight.reshape(leaf_weight.size, 1))
+                self.thresholds.append(thresholds)
+                self.threshold_types.append(threshold_types)
+                split_idx = np.asarray(tree["split_indices"], dtype=np.int64)
+                self.features.append(split_idx)
+                split_types = _to_integers(tree["split_type"])
+                self.split_types.append(split_types)
+                cat_segments = tree["categories_segments"]
+                cat_sizes = tree["categories_sizes"]
+                cat_nodes = tree["categories_nodes"]
+                cats = tree["categories"]
+                tree_categories = self.parse_categories(cat_nodes, cat_segments, cat_sizes, cats, self.node_cleft[-1])
+                self.categories.append(tree_categories)
+
+    _tree_mod.XGBTreeModelLoader.__init__ = _patched_xgb_loader_init
+except Exception:
+    pass
+
 from ml.explainability.config import ShapConfig
 
 TREE_MODEL_NAMES = frozenset({"random_forest", "xgboost"})
