@@ -11,7 +11,7 @@ built on multimodal wearable sensor data (EMG · IMU · PPG).**
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="requirements.txt"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-blue.svg"></a>
   <a href="dashboard/package.json"><img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933.svg"></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-292%20passing-brightgreen.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-345%20passing-brightgreen.svg">
   <a href="https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/Sangamithraa077/Agentic-Fatigue-Fingerprinting.svg"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
@@ -52,6 +52,8 @@ Every number on the dashboard is real. There is no synthetic data, no mocked pre
 **AI & Machine Learning**
 - Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) fatigue models, benchmarked under one identical, leakage-safe evaluation protocol
 - A multimodal cross-modal attention architecture that fuses EMG, IMU, and PPG into a single shared representation
+- On-the-fly in-memory training data augmentation (Gaussian noise jittering, magnitude scaling, and time warping) to combat overfitting without disk overhead or data leakage
+- Epistemic uncertainty quantification via Monte Carlo Dropout (50 stochastic forward passes generating 95% confidence intervals on the Borg RPE scale)
 - SHAP-based explainability — global and local feature attribution, with automatic explainer selection per model family
 - Personalization layer — Leave-One-Subject-Out evaluation and subject-specific baseline adjustment, so the model adapts to *this* athlete, not just "the average one"
 - A 4-agent orchestration layer (Data Intelligence, Personalization, Explainability, Decision & Reporting) that synthesizes every stage above into one coaching recommendation
@@ -178,7 +180,7 @@ The agents run against **live inference from the real trained model and replay e
 Agentic-Fatigue-Fingerprinting/
 ├── ml/
 │   ├── data_models/           Typed dataset object graph (Dataset → Subject → Condition → Sensors)
-│   ├── preprocessing/         Dataset loader and EMG/IMU/PPG signal preprocessors
+│   ├── preprocessing/         Dataset loader, EMG/IMU/PPG signal preprocessors, and in-memory data augmentation
 │   ├── feature_engineering/   Windowing, feature extraction, validation, and selection
 │   ├── models/
 │   │   ├── common/            Shared configuration, dataset builder, group-aware splitting, metrics
@@ -196,7 +198,7 @@ Agentic-Fatigue-Fingerprinting/
 ├── notebooks/                  Runnable, reproducible pipeline and report scripts
 ├── reports/                    Generated Markdown reports and figures (real benchmark output)
 ├── docs/                       Design-rationale documentation per module
-├── tests/                      pytest suite (292 tests)
+├── tests/                      pytest suite (345+ passing tests)
 ├── datasets/                   Raw and processed data (not version-controlled)
 └── assets/                     Diagrams and images
 ```
@@ -254,7 +256,7 @@ datasets/raw/WSD4FEDSRM/
 python -m pytest tests/ -v
 ```
 
-All 292 tests should pass — if they do, the environment is ready.
+All 345+ tests should pass — if they do, the environment is ready.
 
 ---
 
@@ -385,7 +387,7 @@ In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Popul
 | Backend API | FastAPI, Uvicorn, Pydantic |
 | Real-time Streaming | Server-Sent Events (SSE) |
 | Frontend | Vite, Chart.js, Lucide Icons |
-| Testing | pytest (292 tests) |
+| Testing | pytest (345+ passing tests) |
 | Version Control | Git, GitHub |
 
 ---
