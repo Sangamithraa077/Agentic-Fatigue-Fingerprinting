@@ -7,7 +7,6 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import numpy as np
-import pytest
 
 from backend.agents.base_agent import AgentResult
 from backend.agents.data_agent import DataIntelligenceAgent

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from backend.agents.base_agent import AgentResult, BaseAgent
 

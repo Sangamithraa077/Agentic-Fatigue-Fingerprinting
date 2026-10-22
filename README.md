@@ -1,64 +1,178 @@
-<h1 align="center">Fatigue Fingerprinting</h1>
+<div align="center">
 
-<p align="center">
-  A Multimodal, Explainable, and Personalized AI Framework for Wearable Fatigue Intelligence
-</p>
+# Athlete Intelligence
 
-<p align="center">
+### Understand. Predict. Perform.
+
+**A real-time, explainable, and personalized AI platform for muscle fatigue intelligence —
+built on multimodal wearable sensor data (EMG · IMU · PPG).**
+
+<p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="requirements.txt"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-blue.svg"></a>
+  <a href="dashboard/package.json"><img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933.svg"></a>
+  <img alt="Tests" src="https://img.shields.io/badge/tests-292%20passing-brightgreen.svg">
+  <a href="https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/Sangamithraa077/Agentic-Fatigue-Fingerprinting.svg"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
+
+[Overview](#overview) •
+[Features](#key-features) •
+[Dashboard](#dashboard-showcase) •
+[Architecture](#architecture) •
+[Installation](#installation) •
+[Documentation](#documentation-index)
+
+</div>
 
 <br/>
 
 ## Overview
 
-Fatigue Fingerprinting is a research framework for detecting, explaining, and personalizing muscle fatigue assessment from multimodal wearable sensor data — surface EMG, IMU, and PPG.
+Most fatigue tracking today comes down to one question, asked after the fact: *"How hard did that feel, on a scale of 1 to 20?"*
 
-Fatigue is conventionally assessed through subjective self-report rather than continuous, objective measurement, and single-sensor approaches capture only part of the picture: EMG reflects local muscular fatigue, while IMU and PPG capture kinematic and cardiovascular signatures that EMG alone misses. Meaningful fatigue intelligence requires fusing these modalities, explaining what drives a given prediction, and accounting for the fact that fatigue tolerance varies substantially between individuals.
+**Athlete Intelligence** takes a different approach. It reads real physiological signals — muscle activity (EMG), movement quality (IMU), and heart response (PPG) — while an athlete is training, runs them through a trained machine learning model, explains *why* the model reached its conclusion, adjusts the result to that specific athlete's own body and strength baseline, and hands the whole thing to a team of coordinated AI agents that turn it into a plain-language coaching recommendation.
 
-This framework addresses all three requirements in a single, cohesive pipeline: signals are cleaned and validated, transformed into biomedically meaningful features, modeled with both classical and attention-based architectures, explained at the feature and modality level, and adapted to the individual through subject-aware evaluation.
+It's built for anyone who needs to understand fatigue as it happens, not after the fact:
 
-| Audience | Use Case |
+| Who | What they get |
 |---|---|
-| Researchers | Wearable-based biomechanics and fatigue physiology |
-| Clinicians and ergonomists | Occupational and rehabilitation fatigue risk assessment |
-| Sports scientists and trainers | Training load and recovery monitoring |
-| ML and AI engineers | Reference architecture for explainable, personalized biomedical time-series modeling |
+| **Athletes** | A live, honest read on how their body is handling a session — not just a number, but *why*. |
+| **Coaches & trainers** | An AI assistant that flags rising fatigue risk before it becomes an injury. |
+| **Clinicians & ergonomists** | Objective, explainable fatigue signal for occupational and rehab settings. |
+| **Researchers** | A full, reproducible ML pipeline — preprocessing through personalization — built on real wearable sensor data. |
+| **Engineers** | A reference architecture for explainable, personalized, agent-orchestrated biomedical time-series AI. |
 
-## Features
+Every number on the dashboard is real. There is no synthetic data, no mocked prediction, and no fallback simulation anywhere in the live product — if the backend is unreachable, the interface says so, honestly, instead of making something up.
 
-| Capability | Description |
+---
+
+## Key Features
+
+**AI & Machine Learning**
+- Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) fatigue models, benchmarked under one identical, leakage-safe evaluation protocol
+- A multimodal cross-modal attention architecture that fuses EMG, IMU, and PPG into a single shared representation
+- SHAP-based explainability — global and local feature attribution, with automatic explainer selection per model family
+- Personalization layer — Leave-One-Subject-Out evaluation and subject-specific baseline adjustment, so the model adapts to *this* athlete, not just "the average one"
+- A 4-agent orchestration layer (Data Intelligence, Personalization, Explainability, Decision & Reporting) that synthesizes every stage above into one coaching recommendation
+
+**Live Product**
+- Real-time signal replay engine — streams an athlete's actual recorded session progressively, exactly as if a live sensor were attached, with the architecture already designed as a drop-in seam for a real sensor later
+- **AI Coach** — a structured recommendation (Priority · Confidence · Recovery Outlook · Suggested Action) built directly from real agent output, not a canned response
+- Dark & light themes, fully re-tinted design system, persisted per user
+- Live-updating charts, HUD-style performance rings, and a skill radar — all driven by the same real payload, perfectly in sync across every tab
+- Accessible by default — focus states, `aria-live` regions, reduced-motion support
+
+---
+
+## Dashboard Showcase
+
+The dashboard is organized around one continuous story — not five disconnected screens:
+
+| Tab | What it shows |
 |---|---|
-| Multimodal Signal Processing | Modality-specific preprocessing pipelines for EMG, IMU, and PPG, each grounded in its own signal characteristics. |
-| Fatigue Prediction | Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) models under one shared, leakage-safe evaluation protocol. |
-| Cross-Modal Attention Model | A multimodal architecture that fuses EMG, IMU, and PPG representations through multi-head cross-modal attention, with interchangeable fusion strategies. |
-| Explainable AI | SHAP-based feature attribution with automatic explainer selection, alongside attention-weight analysis, producing both global and local explanations. |
-| Personalized Intelligence | Subject-level baseline profiling, Leave-One-Subject-Out evaluation, and a personalization layer that adapts population-level predictions to the individual. |
-| Subject-Aware Evaluation | Every data split — cross-validation, train/validation/test, and LOSO — is grouped by subject to prevent leakage across correlated windows. |
-| Modular Architecture | Typed, dataclass-driven components with a consistent configuration pattern, independently reusable across the pipeline. |
-| Reproducible Reporting | Every analysis stage produces a Markdown report with figures, generated directly from a runnable script rather than written by hand. |
+| **Live Performance** | Real EMG/IMU/PPG signals, streamed progressively from the athlete's recorded session |
+| **Performance Score** | A live, human-friendly read on how the body is handling the session right now |
+| **AI Insights** | Why the model reached this conclusion — visual, ranked, plain-language, with technical SHAP values available on demand |
+| **Athlete Profile** | A player-card view of real demographics, strength baseline, and a skill radar |
+| **AI Coach** | A live check-in with the real 4-agent backend — Priority, Confidence, Recovery Outlook, and a Suggested Action |
+
+A persistent hero strip keeps **Performance**, **Fatigue Status**, and the latest **AI Recommendation** visible no matter which tab is open, so the athlete's current state is never more than a glance away.
+
+> **Screenshots**: this repository ships without pre-rendered screenshots (`assets/images/` is present but empty by design — nothing here is stock photography). Run the dashboard locally (see [Installation](#installation)) to see it live in under five minutes, or drop your own captures into `assets/images/` and link them here.
+
+---
 
 ## Architecture
 
-The framework processes sensor data through a linear pipeline, from raw signal to a personalized, explainable fatigue assessment.
-
 ```mermaid
 flowchart TD
-    A[Wearable Sensors<br/>EMG · IMU · PPG] --> B[Signal Processing]
-    B --> C[Feature Engineering]
-    C --> D[Feature Validation]
-    D --> E[Machine Learning<br/>Classical & Deep Learning]
-    E --> F[Multimodal Attention Model]
-    F --> G[Explainability<br/>SHAP & Attention Analysis]
-    G --> H[Personalization<br/>LOSO & Subject Profiles]
-    H --> I["Agentic AI (Planned)"]
-    I --> J[Fatigue Report]
+    subgraph Data["Data Layer"]
+        A[WSD4FEDSRM Dataset<br/>EMG · IMU · PPG · Borg RPE]
+    end
+
+    subgraph ML["ML Pipeline (ml/)"]
+        B[Preprocessing]
+        C[Feature Engineering]
+        D[Classical + Deep Learning Models]
+        E[Multimodal Attention Model]
+        F[Explainability<br/>SHAP + Attention]
+        G[Personalization<br/>LOSO + Subject Profiles]
+    end
+
+    subgraph Backend["Backend (backend/)"]
+        H[Replay Engine<br/>real-time session replay]
+        I[Model Service<br/>cached model + SHAP explainer]
+        J[Agent Orchestrator<br/>4 coordinated agents]
+        K[FastAPI REST API<br/>SSE streaming + REST]
+    end
+
+    subgraph Frontend["Dashboard (dashboard/)"]
+        L[Live Charts & Gauges]
+        M[AI Insights]
+        N[Athlete Profile]
+        O[AI Coach]
+    end
+
+    A --> B --> C --> D --> F
+    C --> E --> F
+    F --> G
+    A -.->|replayed as live stream| H
+    H --> I --> K
+    G --> J
+    F --> J
+    J --> K
+    K -->|SSE + REST| L & M & N & O
 ```
 
-Each stage is an independent, reusable module: models can be explained without retraining, and predictions can be personalized without modifying the underlying model. The agentic orchestration stage is discussed in [Agentic AI Architecture](#agentic-ai-architecture).
+Each stage is independently reusable: a model can be explained without retraining, a prediction can be personalized without touching the model, and the replay engine is deliberately built as the seam a real physical sensor would plug into later — see [`backend/services/replay_engine.py`](backend/services/replay_engine.py) for that design note in context.
 
-## Repository Structure
+---
+
+## AI Pipeline
+
+The exact flow a single window of sensor data travels, from raw recording to a coaching recommendation on screen:
+
+```mermaid
+flowchart LR
+    A[Dataset] --> B[Replay Engine]
+    B --> C[Preprocessing]
+    C --> D[Feature Engineering]
+    D --> E[Prediction]
+    E --> F[Explainability]
+    F --> G[Personalization]
+    G --> H[Agents]
+    H --> I[Dashboard]
+```
+
+1. **Dataset** — real WSD4FEDSRM recordings for the selected athlete
+2. **Replay Engine** — streams that athlete's session forward progressively, one live-looking window at a time
+3. **Preprocessing** — the same modality-specific cleaning used throughout the ML pipeline (band-pass filtering, gap-filling, drift removal)
+4. **Feature Engineering** — sliding-window time/frequency-domain feature extraction
+5. **Prediction** — the trained Random Forest classifier scores the current window
+6. **Explainability** — the SHAP `TreeExplainer` attributes the prediction to specific features
+7. **Personalization** — the prediction is adjusted using this athlete's own strength baseline
+8. **Agents** — four agents turn all of the above into one coherent recommendation
+9. **Dashboard** — every tab updates from this exact same computed window, in sync
+
+---
+
+## Agent Framework
+
+| Agent | Responsibility |
+|---|---|
+| **Data Intelligence Agent** | Audits the live signal stream for missing channels, NaN/Inf artifacts, or packet loss before anything downstream trusts it |
+| **Personalization Agent** | Applies this athlete's real anthropometrics and MVIC strength baseline to the population-level prediction |
+| **Explainability Agent** | Translates the real SHAP attribution vector into a ranked, human-readable narrative |
+| **Decision & Reporting Agent** | Enforces the safety threshold and synthesizes every upstream agent's output into one final recommendation |
+
+`AgentOrchestrator` runs all four sequentially — Data Intelligence → Personalization → Explainability → Decision & Reporting — and short-circuits straight to a safety report if the Data Intelligence Agent rejects the incoming signal.
+
+The agents run against **live inference from the real trained model and replay engine** — every check-in from the dashboard's AI Coach tab triggers a genuine run of this pipeline over the athlete's current window; nothing is templated or replayed from a fixture.
+
+---
+
+## Project Structure
 
 ```
 Agentic-Fatigue-Fingerprinting/
@@ -73,118 +187,191 @@ Agentic-Fatigue-Fingerprinting/
 │   │   └── proposed/          Multimodal cross-modal attention architecture
 │   ├── explainability/        SHAP explainers, attention visualization, report generation
 │   └── personalization/       Subject profiles, LOSO evaluation, personalized prediction, similarity
-├── notebooks/                 Runnable, reproducible pipeline and report scripts
-├── reports/                   Generated Markdown reports and figures
-├── docs/                      Design-rationale documentation per module
-├── tests/                     Unit test suite (pytest)
-├── backend/                   Planned: API, services, database, agentic components
-├── dashboard/                 Planned: interactive visualization frontend
-├── datasets/                  Raw and processed data (not version-controlled)
-└── assets/                    Diagrams and images
+├── backend/
+│   ├── agents/                 Data Intelligence, Personalization, Explainability, Decision/Reporting agents + orchestrator
+│   ├── services/                Replay engine (live session streaming) and cached model/SHAP service
+│   └── api/                    FastAPI app, REST routes, and the real-time SSE replay endpoint
+├── dashboard/                  Athlete Intelligence — the live browser dashboard (Vite + Chart.js + Lucide)
+│   └── src/                     main.js (data + interaction layer), style.css (design system)
+├── notebooks/                  Runnable, reproducible pipeline and report scripts
+├── reports/                    Generated Markdown reports and figures (real benchmark output)
+├── docs/                       Design-rationale documentation per module
+├── tests/                      pytest suite (292 tests)
+├── datasets/                   Raw and processed data (not version-controlled)
+└── assets/                     Diagrams and images
 ```
 
-## Dataset
-
-The framework is built and validated on **WSD4FEDSRM** — *Wearable Sensor Data for Fatigue Estimation during Shoulder Rotation Movements*.
-
-- **Participants** — 34 healthy adults performing repeated shoulder rotation to volitional exhaustion under a controlled load protocol.
-- **Sensors** — surface EMG across six muscles, IMU across six body locations, and finger PPG, alongside self-reported Borg RPE fatigue scores.
-- **Rationale** — one of the few public datasets combining muscular, kinematic, and cardiovascular signals against a genuine exhaustion protocol, matching the exact multimodal scope this framework is built to fuse and explain.
-- **License** — distributed separately under CC BY 4.0 by its original authors and not redistributed in this repository. See [`docs/data_model_architecture.md`](docs/data_model_architecture.md) for how it is loaded, and [Installation](#installation) for how to obtain it.
-
-## Machine Learning Pipeline
-
-| Stage | Description |
-|---|---|
-| Signal Preprocessing | Modality-specific cleaning: EMG band-pass filtering and rectification, IMU gap-filling and consistency checks, PPG baseline-drift removal and smoothing. |
-| Feature Engineering | Configurable sliding-window extraction: time- and frequency-domain EMG features, per-axis and resultant-vector IMU features, and peak-based PPG features. |
-| Feature Validation | Automated detection of missing, infinite, constant, near-zero-variance, and highly correlated features, with mutual-information and variance-based selection diagnostics. |
-| Benchmark Models | Four classical and four deep learning architectures, trained and evaluated under one identical, group-aware protocol for direct comparability. |
-| Multimodal Attention Architecture | Independent per-modality encoders project EMG, IMU, and PPG into a shared embedding space, combined through a configurable fusion module — multi-head cross-modal attention, concatenation, or weighted sum. |
-
-## Explainability
-
-Every prediction can be examined at both the population and individual level.
-
-| Technique | Purpose |
-|---|---|
-| SHAP | Automatic explainer selection per model family — exact `TreeExplainer` for Random Forest and XGBoost, `LinearExplainer` for Logistic Regression — producing summary, beeswarm, waterfall, force, and dependence plots. |
-| Attention Visualization | Cross-modal attention weights from the multimodal architecture, surfaced as heatmaps, modality-importance scores, and attention-weight distributions. |
-| Global Explanations | Dataset-level feature importance, aggregated across many predictions. |
-| Local Explanations | Signed, per-feature contributions for a single prediction. |
-
-Interpretability is a first-class output rather than an auxiliary feature: it is what allows a prediction to be trusted and audited, rather than treated as the output of an opaque model.
-
-## Personalization
-
-Population-level models generalize on average but miss individual variability in muscle activation, body composition, and fatigue tolerance.
-
-| Capability | Description |
-|---|---|
-| Subject Profiles | Per-participant demographic, anthropometric, baseline sensor, and fatigue-history summaries. |
-| Leave-One-Subject-Out Evaluation | Each subject is held out and evaluated against a model trained on everyone else — the standard, leakage-free measure of generalization to a new individual. |
-| Personalized Prediction | A population-level prediction is blended with a subject-specific baseline-deviation signal, adapting the output to that individual's own sensor profile. |
-| Similarity Analysis | Configurable cosine or Euclidean similarity search over subject profiles, identifying the most physiologically similar participants. |
-
-## Agentic AI Architecture
-
-**Planned.** The agents below describe the orchestration layer this framework is designed to support, built on top of the modeling, explainability, and personalization modules described above. They are not yet implemented.
-
-| Agent | Responsibility |
-|---|---|
-| Data Intelligence Agent | Orchestrates data ingestion, preprocessing, and feature extraction, and flags signal-quality issues before they reach modeling. |
-| Explainability Agent | Generates and interprets SHAP and attention-based explanations, translating raw attributions into human-readable rationale. |
-| Personalization Agent | Maintains subject profiles, applies LOSO-informed personalization, and reasons over subject similarity to contextualize an individual's result. |
-| Decision and Reporting Agent | Synthesizes model output, explanation, and personalization context into a final fatigue assessment and narrative report. |
+---
 
 ## Installation
 
-Requires Python 3.10 or later.
+**Prerequisites**
+
+| Requirement | Needed for |
+|---|---|
+| Python 3.10+ | The ML pipeline, explainability, personalization, agents, and API |
+| Node.js 18+ | Building the dashboard from source (optional — the API serves a prebuilt copy directly) |
+| Git | Cloning the repository |
+
+**1. Clone the repository**
 
 ```bash
 git clone https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting.git
 cd Agentic-Fatigue-Fingerprinting
+```
 
+**2. Create and activate a virtual environment**
+
+```bash
 python -m venv venv
-source venv/bin/activate      # On Windows: venv\Scripts\activate
+```
 
+```bash
+# macOS / Linux
+source venv/bin/activate
+
+# Windows (PowerShell)
+venv\Scripts\Activate.ps1
+```
+
+**3. Install Python dependencies**
+
+```bash
 pip install -r requirements.txt
 ```
 
-Download the [WSD4FEDSRM dataset](https://zenodo.org/records/8415066) and extract it to `datasets/raw/WSD4FEDSRM/`.
+**4. Download the dataset**
 
-## Usage
+Download [WSD4FEDSRM](https://zenodo.org/records/8415066) from Zenodo and extract it so the raw files live at:
 
-Each pipeline stage is exposed as a reusable Python module under `ml/`, with a runnable, reproducible entry point under `notebooks/`. Running a script loads and preprocesses the raw sensor data, extracts and validates features, trains or reloads the relevant model, and writes a Markdown report with figures to `reports/`. No report is written by hand — each is the direct, reproducible output of its corresponding script.
+```
+datasets/raw/WSD4FEDSRM/
+```
+
+**5. Verify the installation**
 
 ```bash
-# Load the raw dataset into the typed object model
-python -m ml.preprocessing.dataset_loader
-
-# Run the baseline modeling pipeline
-python notebooks/phase9_baseline_models_report.py
-
-# Run the explainability pipeline
-python notebooks/phase11_explainability_report.py
-
-# Run the personalization pipeline
-python notebooks/phase12_personalization_report.py
-
-# Run the test suite
 python -m pytest tests/ -v
 ```
 
-### Example Workflow
+All 292 tests should pass — if they do, the environment is ready.
 
-```mermaid
-flowchart LR
-    A[Sensor Window] --> B[Prediction]
-    B --> C[Explanation]
-    C --> D[Personalized Insight]
-    D --> E[Report]
+---
+
+## Running the Backend
+
+```bash
+uvicorn backend.api.app:app --reload
 ```
 
-A raw EMG, IMU, or PPG window is scored by a trained model, explained through SHAP or attention analysis, adjusted using the subject's own baseline profile, and summarized into a reproducible report.
+| | |
+|---|---|
+| API root | `http://127.0.0.1:8000` |
+| Interactive API docs (Swagger) | `http://127.0.0.1:8000/docs` |
+| **Dashboard** | `http://127.0.0.1:8000/dashboard/` |
+
+The backend also serves the dashboard directly — you don't need Node.js installed just to use the product.
+
+## Running the Dashboard (frontend dev mode)
+
+Only needed if you're actively editing the dashboard's frontend code and want hot reload:
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+Vite prints a local dev URL (typically `http://localhost:5173`). It still expects the FastAPI backend above to be running, since that's where all the real data comes from.
+
+## Running the Test Suite
+
+```bash
+python -m pytest tests/ -v
+```
+
+---
+
+## Demo
+
+There's no hosted demo — the product replays real, non-public sensor recordings, so the honest way to see it is to run it yourself:
+
+1. Start the backend (`uvicorn backend.api.app:app --reload`)
+2. Open `http://127.0.0.1:8000/dashboard/`
+3. Pick any of the 34 available athletes from the sidebar
+4. Watch their real recorded session replay live across every tab
+5. Open **AI Coach** and click **Check In With Coach** for a live, real 4-agent assessment
+
+First load for a given athlete takes up to about a minute — that's the real preprocessing and feature-extraction pipeline running over their actual recording, not a loading animation for its own sake.
+
+---
+
+## Dataset
+
+Built and validated on **WSD4FEDSRM** — *Wearable Sensor Data for Fatigue Estimation during Shoulder Rotation Movements*.
+
+- **Participants** — 34 healthy adults performing repeated shoulder rotation to volitional exhaustion under a controlled load protocol
+- **Sensors** — surface EMG across six muscles, IMU across six body locations, and finger PPG, alongside self-reported Borg RPE fatigue scores
+- **Why this dataset** — one of the few public datasets combining muscular, kinematic, and cardiovascular signals against a genuine exhaustion protocol, matching the exact multimodal scope this platform fuses and explains
+- **License** — distributed separately under CC BY 4.0 by its original authors and not redistributed in this repository. See [`docs/data_model_architecture.md`](docs/data_model_architecture.md) for how it's loaded.
+
+---
+
+## Model Details
+
+Four classical and four deep learning models were benchmarked under one identical, group-aware (subject-level) evaluation protocol on EMG features, binary fatigue classification:
+
+| Model | Category | Accuracy | ROC-AUC | F1 |
+|---|---|---|---|---|
+| Logistic Regression | classical | 0.560 | 0.570 | 0.540 |
+| SVM | classical | 0.588 | 0.563 | 0.547 |
+| **Random Forest** | classical | 0.625 | 0.586 | 0.561 |
+| XGBoost | classical | 0.664 | 0.598 | 0.535 |
+| 1D-CNN | deep learning | 0.660 | 0.574 | 0.479 |
+| BiLSTM | deep learning | 0.659 | 0.568 | 0.487 |
+| CNN-BiLSTM | deep learning | 0.660 | 0.575 | 0.449 |
+| TCN | deep learning | 0.672 | 0.604 | 0.536 |
+
+**Random Forest is the model actually deployed** in the live dashboard and agent pipeline — chosen for its exact SHAP `TreeExplainer` compatibility, which keeps every explanation shown to an athlete mathematically exact rather than approximated. Full methodology, all feature-subset comparisons, and figures are in [`reports/baseline_models_report.md`](reports/baseline_models_report.md).
+
+---
+
+## Explainability
+
+| Technique | Purpose |
+|---|---|
+| SHAP | Automatic explainer selection per model family — exact `TreeExplainer` for the deployed Random Forest, `LinearExplainer` for linear models |
+| Attention Visualization | Cross-modal attention weights from the multimodal architecture, as heatmaps and modality-importance scores |
+| Global Explanations | Which features matter most across this athlete's entire session |
+| Local Explanations | Signed, per-feature contributions for one specific prediction, live |
+
+In the dashboard, this becomes the **AI Insights** tab: plain-language "what influenced this" first, exact SHAP numbers one click away in a collapsed technical-details panel — never hidden, never the first thing you see.
+
+---
+
+## Personalization
+
+| Capability | Description |
+|---|---|
+| Subject Profiles | Real per-participant demographic, anthropometric, and MVIC strength baseline data |
+| Leave-One-Subject-Out Evaluation | Each subject held out and evaluated against a model trained on everyone else — the standard leakage-free measure of generalizing to a new individual |
+| Personalized Prediction | The population-level prediction blended with this athlete's own baseline deviation |
+| Similarity Analysis | Configurable cosine/Euclidean similarity search to find the most physiologically similar participants |
+
+In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Population Average" comparison and a skill radar (Strength, Resilience, Focus, Endurance) — every axis a documented, real transform of a genuine underlying value.
+
+---
+
+## Future Scope
+
+- Real-time physical wearable device integration (the replay engine is already architected as the exact seam this would plug into — see its module docstring)
+- Edge deployment for on-device inference
+- Clinical validation studies
+- Federated learning across institutions
+- Companion mobile application
+- CI/CD pipeline for automated testing on every pull request
+
+---
 
 ## Technology Stack
 
@@ -195,19 +382,24 @@ A raw EMG, IMU, or PPG window is scored by a trained model, explained through SH
 | Deep Learning | PyTorch |
 | Explainable AI | SHAP |
 | Data Processing | NumPy, SciPy, pandas |
-| Visualization | Matplotlib, Seaborn |
-| Testing | pytest |
+| Backend API | FastAPI, Uvicorn, Pydantic |
+| Real-time Streaming | Server-Sent Events (SSE) |
+| Frontend | Vite, Chart.js, Lucide Icons |
+| Testing | pytest (292 tests) |
 | Version Control | Git, GitHub |
 
-## Future Enhancements
+---
 
-- Real-time wearable device integration
-- Edge deployment for on-device inference
-- Clinical validation studies
-- Federated learning across institutions
-- Companion mobile application
-- Full implementation of the agentic orchestration layer
-- Interactive visualization dashboard
+## Documentation Index
+
+Design-rationale documentation for individual modules lives in [`docs/`](docs/):
+
+- [`data_model_architecture.md`](docs/data_model_architecture.md)
+- [`preprocessing_pipeline.md`](docs/preprocessing_pipeline.md)
+- [`feature_engineering.md`](docs/feature_engineering.md)
+- [`baseline_models.md`](docs/baseline_models.md)
+- [`proposed_model.md`](docs/proposed_model.md)
+- [`explainability.md`](docs/explainability.md)
 
 ## Contributing
 
@@ -218,8 +410,29 @@ Contributions are welcome.
 3. Ensure `python -m pytest tests/ -v` passes before opening a pull request.
 4. Open a pull request with a clear description of the change and its motivation.
 
-For substantial changes, open an issue first to discuss the proposed direction.
+For substantial changes, please open an issue first to discuss direction.
+
+## Acknowledgements
+
+- The **WSD4FEDSRM** dataset authors, for a genuinely rare public dataset combining EMG, IMU, and PPG against a real exhaustion protocol
+- The open-source maintainers of **FastAPI**, **PyTorch**, **scikit-learn**, **SHAP**, **Chart.js**, and **Lucide** — this project stands on their work
+
+## Contributors
+
+<a href="https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Sangamithraa077/Agentic-Fatigue-Fingerprinting" alt="Contributors" />
+</a>
+
+*(This badge renders live from GitHub's contributor graph — see the link above for the current list.)*
 
 ## License
 
 This project's code is licensed under the [MIT License](LICENSE). The WSD4FEDSRM dataset is licensed separately under CC BY 4.0 by its original authors and is not redistributed in this repository.
+
+<div align="center">
+
+<br/>
+
+**Built for athletes, coaches, and researchers who'd rather understand fatigue than guess at it.**
+
+</div>

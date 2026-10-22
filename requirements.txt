@@ -9,6 +9,7 @@ joblib
 
 # Deep Learning & Modeling
 torch
+xgboost
 
 # Explainability
 shap
@@ -26,3 +27,4 @@ httpx>=0.27.0
 
 # Testing
 pytest
+httpx2

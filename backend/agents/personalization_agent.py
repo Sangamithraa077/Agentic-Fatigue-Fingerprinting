@@ -10,7 +10,7 @@ The agent:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import numpy as np
 

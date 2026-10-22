@@ -4,86 +4,83 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agentic Fatigue Fingerprinting - Research Dashboard</title>
+    <title>Athlete Intelligence — Understand. Predict. Perform.</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
     <!-- Dashboard Stylesheet -->
     <link rel="stylesheet" href="./src/style.css">
-    <!-- Chart.js CDN -->
+    <!-- Chart.js + Lucide icon pack (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   </head>
   <body>
+    <!-- Shared gradient defs for HUD rings -->
+    <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+      <defs>
+        <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#2ee6ff" />
+          <stop offset="55%" stop-color="#4f8dff" />
+          <stop offset="100%" stop-color="#a855f7" />
+        </linearGradient>
+      </defs>
+    </svg>
+
     <div id="app">
-      <!-- Sidebar Navigation -->
+      <!-- Sidebar Navigation Rail -->
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </div>
           <div class="brand-text">
-            <h2>FatigueAI</h2>
-            <span>Research Fingerprinting</span>
+            <h2>Athlete Intelligence</h2>
+            <span>Understand · Predict · Perform</span>
           </div>
         </div>
 
-        <nav class="nav-menu">
+        <nav class="nav-menu" aria-label="Dashboard sections">
+          <div class="nav-slide-indicator" id="navSlideIndicator" aria-hidden="true"></div>
           <button class="nav-item active" data-tab="signals">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-            </svg>
-            <span>Multimodal Signals</span>
+            <i data-lucide="activity"></i>
+            <span>Live Performance</span>
+            <span class="nav-step-index">01</span>
           </button>
           <button class="nav-item" data-tab="predictions">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 6v6l4 2"></path>
-            </svg>
-            <span>Fatigue Fingerprint</span>
+            <i data-lucide="gauge"></i>
+            <span>Performance Score</span>
+            <span class="nav-step-index">02</span>
           </button>
           <button class="nav-item" data-tab="explainability">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="20" x2="18" y2="10"></line>
-              <line x1="12" y1="20" x2="12" y2="4"></line>
-              <line x1="6" y1="20" x2="6" y2="14"></line>
-            </svg>
-            <span>SHAP Explainability</span>
+            <i data-lucide="brain-circuit"></i>
+            <span>AI Insights</span>
+            <span class="nav-step-index">03</span>
           </button>
           <button class="nav-item" data-tab="personalization">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span>Personalization & LOSO</span>
+            <i data-lucide="user-round"></i>
+            <span>Athlete Profile</span>
+            <span class="nav-step-index">04</span>
           </button>
           <button class="nav-item" data-tab="agents">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            <span>Agent Control Loop</span>
+            <i data-lucide="cpu"></i>
+            <span>AI Coach</span>
+            <span class="nav-step-index">05</span>
           </button>
         </nav>
 
         <div class="sidebar-footer">
           <div class="subject-selector-box">
-            <label for="subjectSelect">Subject Context:</label>
-            <select id="subjectSelect">
-              <option value="P01">Subject P01 (Female, 31y)</option>
-              <option value="P02">Subject P02 (Female, 23y)</option>
-              <option value="P03" selected>Subject P03 (Male, 26y)</option>
-              <option value="P04">Subject P04 (Male, 25y)</option>
-              <option value="P05">Subject P05 (Female, 21y)</option>
-              <option value="P06">Subject P06 (Male, 26y)</option>
+            <label for="subjectSelect">Athlete</label>
+            <select id="subjectSelect" aria-label="Select athlete">
+              <option value="">Loading athletes...</option>
             </select>
           </div>
-          <div class="status-indicator">
+          <div class="status-indicator" id="connectionStatus" role="status">
             <span class="pulse-dot"></span>
-            <span class="status-text">Pipeline: Live (1000Hz EMG / 100Hz IMU / 200Hz PPG)</span>
+            <span class="status-text" id="connectionStatusText">Connecting to backend...</span>
           </div>
         </div>
       </aside>
@@ -93,58 +90,104 @@
         <!-- Top Banner Header -->
         <header class="top-header">
           <div class="header-title">
-            <h1 id="pageTitle">Multimodal Sensor Stream Analysis</h1>
-            <p id="pageSubtitle">Real-time signal inspection, artifact filtering, and synchronized feature extraction</p>
+            <h1 id="pageTitle">Live Performance</h1>
+            <p id="pageSubtitle">Real muscle, movement, and heart-response signals, streamed live from your last session</p>
           </div>
           <div class="header-actions">
-            <div class="badge badge-success">WSD4FEDSRM Corpus</div>
-            <div class="badge badge-purple">TCN + SHAP Ensemble</div>
-            <button class="btn btn-outline" id="togglePlayback">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
+            <div class="badge badge-success">Real Session Replay</div>
+            <div class="badge badge-purple">AI Model + Explainability</div>
+            <div class="badge badge-moderate" id="pausedBadge" style="display: none;">Stream Paused</div>
+            <button class="btn btn-outline" id="themeToggle" aria-label="Switch between dark and light mode" title="Switch theme">
+              <span id="themeToggleIconWrap"><i data-lucide="moon" style="width: 14px; height: 14px;"></i></span>
+              <span id="themeToggleText">Dark</span>
+            </button>
+            <button class="btn btn-outline" id="togglePlayback" aria-label="Pause or resume the live signal stream">
+              <span id="playbackIconWrap"><i data-lucide="pause" style="width: 14px; height: 14px;"></i></span>
               <span id="playbackBtnText">Pause Stream</span>
             </button>
           </div>
         </header>
 
+        <div class="error-banner" id="errorBanner" style="display: none;" role="alert"></div>
+
+        <!-- Persistent Hero -- cinematic status readout, updates live from the same replay window as every tab below -->
+        <section class="hero" id="heroSection" aria-label="Today's performance summary">
+          <div class="hero-top">
+            <span class="hero-eyebrow">Today's Performance</span>
+            <span class="hero-athlete">Athlete <strong id="heroAthleteId">--</strong></span>
+          </div>
+          <div class="hero-main">
+            <div class="hero-score">
+              <div class="ring-wrap" style="width: 128px; height: 128px;">
+                <svg viewBox="0 0 120 120" width="128" height="128">
+                  <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                  <circle class="ring-progress" id="heroRingProgress" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+                </svg>
+                <div class="ring-center">
+                  <span class="ring-value" id="heroScoreValue">--</span>
+                  <span class="ring-unit">Score</span>
+                </div>
+              </div>
+              <span class="hero-score-label">Performance</span>
+            </div>
+            <div class="hero-block">
+              <span class="hs-label">Fatigue Status</span>
+              <div class="hs-value"><span class="status-pill tone-good" id="heroStatusPill">--</span></div>
+              <div class="hs-sub" id="heroFatigueSub">--</div>
+            </div>
+            <div class="hero-block">
+              <span class="hs-label">AI Recommendation</span>
+              <div class="hs-value" id="heroRecommendation" style="font-size: 0.9rem; font-weight: 500;">Check in with your AI Coach for a live recommendation.</div>
+              <div class="hs-sub" id="heroRecommendationSub">Not yet assessed this session</div>
+            </div>
+          </div>
+        </section>
+
         <!-- Dynamic View Containers -->
         <div class="content-body">
-          
-          <!-- TAB 1: SIGNALS -->
+
+          <!-- TAB 1: LIVE PERFORMANCE -->
           <section id="tab-signals" class="tab-content active">
+            <div class="section-lede">
+              <h2>Live Performance</h2>
+              <p>Real muscle (EMG), movement (IMU), and heart-response (PPG) signals — replayed progressively from your recorded session, exactly as they were captured.</p>
+            </div>
             <div class="metrics-grid">
               <div class="metric-card">
                 <div class="metric-header">
-                  <span class="metric-label">EMG RMS (Anterior Deltoid)</span>
-                  <span class="metric-badge">1000 Hz</span>
+                  <div class="metric-icon"><i data-lucide="activity"></i></div>
+                  <span class="metric-badge">Shoulder · live</span>
                 </div>
-                <div class="metric-value" id="emgRmsVal">0.482 <span class="unit">mV</span></div>
-                <div class="metric-trend trend-up">↑ +14.2% fatigue drift</div>
+                <span class="metric-label">Muscle Activity</span>
+                <div class="metric-value" id="emgRmsVal">-- <span class="unit"></span></div>
+                <div class="metric-trend">Real signal, current moment</div>
               </div>
               <div class="metric-card">
                 <div class="metric-header">
-                  <span class="metric-label">IMU Mean Jerk (Upper Arm)</span>
-                  <span class="metric-badge">100 Hz</span>
+                  <div class="metric-icon"><i data-lucide="move-3d"></i></div>
+                  <span class="metric-badge">Upper arm · live</span>
                 </div>
-                <div class="metric-value" id="imuJerkVal">12.4 <span class="unit">m/s³</span></div>
-                <div class="metric-trend trend-up">↑ Tremor buildup</div>
+                <span class="metric-label">Movement Quality</span>
+                <div class="metric-value" id="imuJerkVal">-- <span class="unit"></span></div>
+                <div class="metric-trend">Average across this moment</div>
               </div>
               <div class="metric-card">
                 <div class="metric-header">
-                  <span class="metric-label">PPG Heart Rate</span>
-                  <span class="metric-badge">200 Hz</span>
+                  <div class="metric-icon"><i data-lucide="heart-pulse"></i></div>
+                  <span class="metric-badge">Pulse · live</span>
                 </div>
-                <div class="metric-value" id="ppgHrVal">118 <span class="unit">BPM</span></div>
-                <div class="metric-trend trend-neutral">~ Moderate exertion</div>
+                <span class="metric-label">Heart Response</span>
+                <div class="metric-value" id="ppgHrVal">-- <span class="unit"></span></div>
+                <div class="metric-trend">Average across this moment</div>
               </div>
               <div class="metric-card">
                 <div class="metric-header">
-                  <span class="metric-label">Current Task Condition</span>
-                  <span class="metric-badge">Load 50-60%</span>
+                  <div class="metric-icon"><i data-lucide="target"></i></div>
+                  <span class="metric-badge" id="conditionBadge">--</span>
                 </div>
-                <div class="metric-value" style="font-size: 1.25rem; color: var(--color-accent);">External Rotation</div>
-                <div class="metric-trend">Task 6 / 50-60% MVIC</div>
+                <span class="metric-label">Current Activity</span>
+                <div class="metric-value" style="font-size: 1.25rem; color: var(--neon-cyan);" id="conditionDirection">--</div>
+                <div class="metric-trend" id="conditionIdText">--</div>
               </div>
             </div>
 
@@ -152,80 +195,107 @@
               <div class="chart-card span-2">
                 <div class="chart-header">
                   <div>
-                    <h3>Surface Electromyography (sEMG) - 6 Muscle Channels</h3>
-                    <p class="chart-sub">Raw signal with Butterworth bandpass (20-450 Hz) and notch filtering</p>
+                    <h3>Muscle Activity — 3 Shoulder Muscles</h3>
+                    <p class="chart-sub">Real, filtered muscle signal replayed live</p>
                   </div>
                   <div class="channel-pills">
                     <span class="pill active">Ant. Deltoid</span>
                     <span class="pill active">Infraspinatus</span>
                     <span class="pill active">Lat. Dorsi</span>
-                    <span class="pill">Pect. Major</span>
-                    <span class="pill">Post. Deltoid</span>
-                    <span class="pill">Upp. Trapezius</span>
                   </div>
                 </div>
                 <div class="chart-container">
                   <canvas id="emgChart"></canvas>
                 </div>
+                <details class="tech-details">
+                  <summary>Technical details</summary>
+                  <div class="tech-details-body">Raw surface EMG (sEMG), Butterworth bandpass 20–450 Hz with notch filtering. Sampled at 1000 Hz.</div>
+                </details>
               </div>
 
               <div class="chart-card">
                 <div class="chart-header">
                   <div>
-                    <h3>IMU Kinematics (Upper Arm 3-Axis Acc)</h3>
-                    <p class="chart-sub">Tri-axial acceleration during shoulder rotation cycles</p>
+                    <h3>Movement Quality</h3>
+                    <p class="chart-sub">Tri-axial motion during the exercise</p>
                   </div>
                 </div>
                 <div class="chart-container">
                   <canvas id="imuChart"></canvas>
                 </div>
+                <details class="tech-details">
+                  <summary>Technical details</summary>
+                  <div class="tech-details-body">Upper-arm IMU accelerometer, 3 axes, 100 Hz.</div>
+                </details>
               </div>
 
               <div class="chart-card">
                 <div class="chart-header">
                   <div>
-                    <h3>PPG Blood Volume Pulse (BVP)</h3>
-                    <p class="chart-sub">Infrared absorption waveform (200Hz finger sensor)</p>
+                    <h3>Heart Response</h3>
+                    <p class="chart-sub">Blood volume pulse waveform</p>
                   </div>
                 </div>
                 <div class="chart-container">
                   <canvas id="ppgChart"></canvas>
                 </div>
+                <details class="tech-details">
+                  <summary>Technical details</summary>
+                  <div class="tech-details-body">Infrared PPG (BVP), 200 Hz finger sensor.</div>
+                </details>
               </div>
             </div>
           </section>
 
-          <!-- TAB 2: FATIGUE FINGERPRINT -->
+          <!-- TAB 2: PERFORMANCE SCORE -->
           <section id="tab-predictions" class="tab-content">
+            <div class="section-lede">
+              <h2>Performance Score</h2>
+              <p>A live, human-friendly read on how your body is handling this session — powered by the trained AI model underneath.</p>
+            </div>
             <div class="split-view">
               <div class="card gauge-card">
-                <h3>Estimated Borg RPE Fatigue Level</h3>
-                <p class="chart-sub">Ground Truth vs Baseline RF vs Deep TCN Model</p>
+                <h3>Performance Score</h3>
+                <p class="chart-sub">Higher is better · updates every moment</p>
 
                 <div class="gauge-container">
-                  <div class="gauge-value-display">
-                    <span class="rpe-number" id="currentRpe">16.4</span>
-                    <span class="rpe-scale">/ 20</span>
+                  <div class="big-ring-wrap">
+                    <svg viewBox="0 0 120 120" width="210" height="210">
+                      <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                      <circle class="ring-progress" id="scoreRingProgress" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+                    </svg>
+                    <div class="gauge-value-display">
+                      <span class="rpe-number" id="currentProbability">--</span>
+                      <span class="rpe-scale">/ 100</span>
+                    </div>
                   </div>
-                  <div class="rpe-status-label danger">Heavy Fatigue / Exhaustion</div>
+                  <div class="rpe-status-label" id="predictedLabelBadge">Waiting for stream...</div>
                 </div>
 
                 <div class="fingerprint-summary">
                   <div class="fp-row">
-                    <span>Predicted Borg RPE:</span>
-                    <strong>16.4 (± 0.6)</strong>
+                    <span>Fatigue Risk:</span>
+                    <strong id="fatigueRiskText">--</strong>
                   </div>
                   <div class="fp-row">
-                    <span>Predicted KSS Sleepiness:</span>
-                    <strong>7 / 9 (Sleepy)</strong>
+                    <span>AI Confidence:</span>
+                    <strong id="confidenceText">--</strong>
                   </div>
                   <div class="fp-row">
-                    <span>EMG Median Freq Shift:</span>
-                    <strong style="color: var(--color-danger);">-24.5 Hz (Fatigue)</strong>
+                    <span>Estimated Borg RPE:</span>
+                    <strong id="estimatedRpeText" title="Derived from the AI model's own fatigue-risk output, not a separate regression model">--</strong>
                   </div>
                   <div class="fp-row">
-                    <span>Task Endurance Limit:</span>
-                    <strong>182 sec / 210 sec</strong>
+                    <span>Recorded Borg RPE (self-report):</span>
+                    <strong id="groundTruthRpeText">--</strong>
+                  </div>
+                  <div class="fp-row">
+                    <span>Current activity:</span>
+                    <strong id="currentTaskText">--</strong>
+                  </div>
+                  <div class="fp-row">
+                    <span>Predicted class:</span>
+                    <strong id="predictedClassText">--</strong>
                   </div>
                 </div>
               </div>
@@ -233,8 +303,8 @@
               <div class="card flex-1">
                 <div class="chart-header">
                   <div>
-                    <h3>Fatigue Progression Trajectory (Trial Duration)</h3>
-                    <p class="chart-sub">Comparing Borg RPE score drift over time across internal/external rotation tasks</p>
+                    <h3>Performance Trend</h3>
+                    <p class="chart-sub">Your performance score across the session, alongside recorded Borg RPE where available</p>
                   </div>
                 </div>
                 <div class="chart-container" style="height: 340px;">
@@ -246,8 +316,8 @@
             <div class="chart-card margin-top">
               <div class="chart-header">
                 <div>
-                  <h3>Muscle-Specific Spectral Fatigue Fingerprint</h3>
-                  <p class="chart-sub">Mean Frequency (MNF) and Median Frequency (MDF) degradation across shoulder muscles</p>
+                  <h3>What the AI Is Measuring Right Now</h3>
+                  <p class="chart-sub">The real signal features feeding this moment's prediction</p>
                 </div>
               </div>
               <div class="chart-container" style="height: 260px;">
@@ -256,28 +326,62 @@
             </div>
           </section>
 
-          <!-- TAB 3: SHAP EXPLAINABILITY -->
+          <!-- TAB 3: AI INSIGHTS -->
           <section id="tab-explainability" class="tab-content">
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <div class="metric-label">Top Contributing Feature</div>
-                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-cyan);">EMG_MDF_AntDeltoid</div>
-                <div class="metric-trend">+2.84 SHAP impact score</div>
+            <div class="section-lede">
+              <h2>AI Insights</h2>
+              <p>Why did the AI reach this conclusion? Here's what mattered most for this moment's score.</p>
+            </div>
+
+            <div class="card">
+              <div class="insight-row">
+                <div class="insight-rank">1</div>
+                <div class="insight-text">
+                  <div class="insight-title" id="shapTopFeature1">--</div>
+                  <div class="insight-desc" id="shapTopFeature1Desc">Waiting for live data...</div>
+                </div>
+                <div class="insight-bar-wrap">
+                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature1Bar"></div></div>
+                  <span class="insight-impact" id="shapTopFeature1Val">--</span>
+                </div>
               </div>
-              <div class="metric-card">
-                <div class="metric-label">Secondary Driver</div>
-                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-accent);">IMU_Jerk_UpperArm</div>
-                <div class="metric-trend">+1.62 SHAP impact score</div>
+              <div class="insight-row">
+                <div class="insight-rank">2</div>
+                <div class="insight-text">
+                  <div class="insight-title" id="shapTopFeature2">--</div>
+                  <div class="insight-desc" id="shapTopFeature2Desc">Waiting for live data...</div>
+                </div>
+                <div class="insight-bar-wrap">
+                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature2Bar"></div></div>
+                  <span class="insight-impact" id="shapTopFeature2Val">--</span>
+                </div>
               </div>
-              <div class="metric-card">
-                <div class="metric-label">Model Confidence Interval</div>
-                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-success);">94.2%</div>
-                <div class="metric-trend">SHAP TreeExplainer calibrated</div>
+              <div class="insight-row">
+                <div class="insight-rank">3</div>
+                <div class="insight-text">
+                  <div class="insight-title" id="shapTopFeature3">--</div>
+                  <div class="insight-desc" id="shapTopFeature3Desc">Waiting for live data...</div>
+                </div>
+                <div class="insight-bar-wrap">
+                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature3Bar"></div></div>
+                  <span class="insight-impact" id="shapTopFeature3Val">--</span>
+                </div>
               </div>
+
+              <details class="tech-details">
+                <summary>Advanced technical details (SHAP values)</summary>
+                <div class="tech-details-body" id="shapTechDetails">--</div>
+              </details>
+            </div>
+
+            <div class="metrics-grid margin-top">
               <div class="metric-card">
-                <div class="metric-label">Anthropometric Interaction</div>
-                <div class="metric-value" style="font-size: 1.2rem; color: var(--color-purple);">UpperArm_Length</div>
-                <div class="metric-trend">+0.95 Modulating weight</div>
+                <div class="metric-header">
+                  <div class="metric-icon"><i data-lucide="sparkles"></i></div>
+                </div>
+                <span class="metric-label">AI Confidence</span>
+                <div class="metric-value" style="font-size: 1.5rem; color: var(--neon-cyan);" id="shapConfidence">--</div>
+                <div class="metric-trend">How sure the model is about this prediction</div>
               </div>
             </div>
 
@@ -285,8 +389,8 @@
               <div class="chart-card flex-1">
                 <div class="chart-header">
                   <div>
-                    <h3>Global SHAP Feature Importance</h3>
-                    <p class="chart-sub">Mean absolute SHAP value across all 34 WSD4FEDSRM subjects</p>
+                    <h3>What Matters Most, Overall</h3>
+                    <p class="chart-sub">This athlete's biggest fatigue drivers across their whole session</p>
                   </div>
                 </div>
                 <div class="chart-container" style="height: 360px;">
@@ -297,8 +401,8 @@
               <div class="chart-card flex-1">
                 <div class="chart-header">
                   <div>
-                    <h3>Local Explanation Waterfall (Sample #420)</h3>
-                    <p class="chart-sub">Feature push/pull vectors driving the single-sample prediction to RPE 16.4</p>
+                    <h3>Why This Moment's Score</h3>
+                    <p class="chart-sub">What's pushing the score up or down, right now</p>
                   </div>
                 </div>
                 <div class="chart-container" style="height: 360px;">
@@ -308,48 +412,107 @@
             </div>
           </section>
 
-          <!-- TAB 4: PERSONALIZATION & LOSO -->
+          <!-- TAB 4: ATHLETE PROFILE (Player Card) -->
           <section id="tab-personalization" class="tab-content">
-            <div class="card">
-              <div class="chart-header">
-                <div>
-                  <h3>Subject Profile & Anthropometric Fingerprint: Subject P03</h3>
-                  <p class="chart-sub">Demographic characteristics used for Leave-One-Subject-Out (LOSO) domain adaptation</p>
+            <div class="section-lede">
+              <h2>Athlete Profile</h2>
+              <p>Real demographic, strength, and baseline data — this is what personalizes every prediction to this athlete.</p>
+            </div>
+
+            <div class="player-card">
+              <div class="player-card-grid">
+                <div class="player-power-ring">
+                  <svg viewBox="0 0 120 120" width="148" height="148" style="transform: rotate(-90deg); overflow: visible;">
+                    <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                    <circle class="ring-progress" id="playerPowerRing" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+                  </svg>
+                  <div class="player-power-center">
+                    <span class="ppc-value" id="playerPowerValue">--</span>
+                    <span class="ppc-label">Power Level</span>
+                  </div>
                 </div>
-              </div>
-              <div class="profile-grid">
-                <div class="profile-item">
-                  <span class="p-label">Sex / Age:</span>
-                  <span class="p-val">Male / 26 years</span>
+                <div class="player-id">
+                  <h3 id="playerCardName">Athlete --</h3>
+                  <div class="player-tag" id="playerCardTag">Calibrating…</div>
+                  <div class="player-meta">
+                    <span>Dominant Arm: <strong id="playerMetaArm">--</strong></span>
+                    <span>Profile: <strong id="playerMetaDemo">--</strong></span>
+                    <span>Strength (MVIC): <strong id="playerMetaStrength">--</strong></span>
+                  </div>
                 </div>
-                <div class="profile-item">
-                  <span class="p-label">Height / Weight:</span>
-                  <span class="p-val">183 cm / 78 kg</span>
-                </div>
-                <div class="profile-item">
-                  <span class="p-label">Dominant Hand:</span>
-                  <span class="p-val">Right</span>
-                </div>
-                <div class="profile-item">
-                  <span class="p-label">Upper Arm Length:</span>
-                  <span class="p-val">34.2 cm</span>
-                </div>
-                <div class="profile-item">
-                  <span class="p-label">MVIC Baseline Force (IR):</span>
-                  <span class="p-val">245.8 N</span>
-                </div>
-                <div class="profile-item">
-                  <span class="p-label">MVIC Baseline Force (ER):</span>
-                  <span class="p-val">198.4 N</span>
+                <div class="player-radar-wrap">
+                  <canvas id="skillRadarChart"></canvas>
                 </div>
               </div>
             </div>
 
+            <div class="profile-cards-row">
+              <div class="profile-stat-card">
+                <div class="psc-icon tone-cyan"><i data-lucide="dumbbell"></i></div>
+                <div class="psc-label">Strength (MVIC)</div>
+                <div class="psc-value" id="profileCardStrength">--</div>
+                <div class="psc-sub">Internal / external rotation baseline</div>
+              </div>
+              <div class="profile-stat-card">
+                <div class="psc-icon tone-blue"><i data-lucide="hand"></i></div>
+                <div class="psc-label">Dominant Arm</div>
+                <div class="psc-value" id="profileCardArm">--</div>
+                <div class="psc-sub">Used to interpret asymmetry</div>
+              </div>
+              <div class="profile-stat-card">
+                <div class="psc-icon tone-purple"><i data-lucide="scale"></i></div>
+                <div class="psc-label">Body Composition</div>
+                <div class="psc-value" id="profileCardBody">--</div>
+                <div class="psc-sub">BMI / body fat</div>
+              </div>
+              <div class="profile-stat-card">
+                <div class="psc-icon tone-cyan"><i data-lucide="user-round"></i></div>
+                <div class="psc-label">Demographics</div>
+                <div class="psc-value" id="profileCardDemo">--</div>
+                <div class="psc-sub">Sex / age</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <details class="tech-details" open>
+                <summary>Full profile data</summary>
+                <div class="profile-grid">
+                  <div class="profile-item">
+                    <span class="p-label">Sex / Age</span>
+                    <span class="p-val" id="profileSexAge">--</span>
+                  </div>
+                  <div class="profile-item">
+                    <span class="p-label">Height / Mass</span>
+                    <span class="p-val" id="profileHeightMass">--</span>
+                  </div>
+                  <div class="profile-item">
+                    <span class="p-label">Dominant Hand</span>
+                    <span class="p-val" id="profileHand">--</span>
+                  </div>
+                  <div class="profile-item">
+                    <span class="p-label">BMI / Body Fat</span>
+                    <span class="p-val" id="profileBmiFat">--</span>
+                  </div>
+                  <div class="profile-item">
+                    <span class="p-label">MVIC Baseline (Internal Rotation)</span>
+                    <span class="p-val" id="profileMvicIr">--</span>
+                  </div>
+                  <div class="profile-item">
+                    <span class="p-label">MVIC Baseline (External Rotation)</span>
+                    <span class="p-val" id="profileMvicEr">--</span>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- Subject id used for the player-card header + section title -->
+            <span id="profileSubjectId" style="display: none;">--</span>
+
             <div class="chart-card margin-top">
               <div class="chart-header">
                 <div>
-                  <h3>Personalized vs Generic Population Model Accuracy</h3>
-                  <p class="chart-sub">LOSO Cross-Validation RMSE by Subject across 34 participants</p>
+                  <h3>Your Score vs. Population Average</h3>
+                  <p class="chart-sub">Generic population model vs. this athlete's own baseline-adjusted score</p>
                 </div>
               </div>
               <div class="chart-container" style="height: 320px;">
@@ -358,30 +521,31 @@
             </div>
           </section>
 
-          <!-- TAB 5: AGENTS -->
+          <!-- TAB 5: AI COACH (AI Terminal) -->
           <section id="tab-agents" class="tab-content">
-            <div class="split-view">
-              <div class="card flex-1">
-                <div class="chart-header">
-                  <div>
-                    <h3>Autonomous Agentic Oversight System</h3>
-                    <p class="chart-sub">Real-time fatigue monitoring loop & safety decision engine</p>
-                  </div>
-                  <div class="badge badge-success">Agent Swarm Active</div>
+            <div class="section-lede">
+              <h2>AI Coach</h2>
+              <p>Your real-time coaching assistant — powered by the live agent backend, not a script.</p>
+            </div>
+            <div class="card coach-shell">
+              <div class="chart-header">
+                <div>
+                  <h3>AI Coach</h3>
+                  <p class="chart-sub">Ask for a check-in any time during your session</p>
                 </div>
+                <div class="badge badge-success">Coach Online</div>
+              </div>
 
-                <div class="agent-controls">
+              <div class="coach-controls">
+                <div>
                   <div class="control-box">
-                    <label>Agent Alert Threshold (Borg RPE):</label>
-                    <input type="range" id="alertThreshold" min="12" max="18" value="15" step="0.5">
+                    <label for="alertThreshold">Coach Alert Sensitivity</label>
+                    <input type="range" id="alertThreshold" min="12" max="18" value="15" step="0.5" aria-label="Coach alert sensitivity, Borg RPE threshold">
                     <span id="thresholdVal">15.0 (Hard Exertion)</span>
                   </div>
-                  <button class="btn btn-primary" id="triggerAgentCheck">Run Agent Loop Cycle</button>
+                  <div class="control-sub" id="currentRpeVsThreshold">Waiting for live data...</div>
                 </div>
-
-                <div class="agent-log-box" id="agentLogs">
-                  <!-- Logs dynamically inserted -->
-                </div>
+                <button class="btn btn-primary" id="triggerAgentCheck" disabled>Check In With Coach</button>
 
                 <!-- MODULE 12.8: RAG EXPLAIN PANEL -->
                 <div class="card margin-top" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(0, 240, 255, 0.2);">
@@ -395,7 +559,7 @@
                     </div>
                   </div>
                   <div id="ragExplainContent" style="padding: 12px; font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; background: rgba(0,0,0,0.2); border-radius: 6px; margin-top: 10px;">
-                    <p style="margin: 0;"><em>Click 'Run Agent Loop Cycle' or select an Ask-Your-Data query below to generate a grounded explanation...</em></p>
+                    <p style="margin: 0;"><em>Click 'Check In With Coach' or select an Ask-Your-Data query below to generate a grounded explanation...</em></p>
                   </div>
                   <div id="ragSourceTags" style="margin-top: 8px; font-size: 0.75rem; color: #94a3b8; display: flex; flex-wrap: wrap; gap: 6px;"></div>
                 </div>
@@ -417,33 +581,56 @@
                 </div>
               </div>
 
-              <div class="card" style="width: 320px;">
-                <h3>Active AI Agents</h3>
-                <div class="agent-list">
-                  <div class="agent-status-card active">
-                    <div class="agent-name">🛡️ Safety Sentinel Agent</div>
-                    <p class="agent-role">Monitors IMU tremor & EMG spectral drop for over-exertion risk.</p>
-                    <span class="badge badge-success">Running</span>
+              <div id="recommendationCardSlot"></div>
+
+              <div class="coach-feed" id="agentLogs" aria-live="polite">
+                <div class="coach-placeholder">Select an athlete and click "Check In With Coach" to get a live assessment.</div>
+              </div>
+            </div>
+
+            <div class="card margin-top">
+              <h3>Meet Your AI Team</h3>
+              <div class="agent-status-strip" style="margin-top: 1rem;">
+                  <div class="agent-status-card">
+                    <div class="asc-icon"><i data-lucide="radio-tower"></i></div>
+                    <div>
+                      <div class="agent-name">Signal Analyst</div>
+                      <p class="agent-role">Checks your live muscle, movement, and heart-response data for quality issues.</p>
+                      <span class="badge badge-success" id="dataAgentBadge">Ready</span>
+                    </div>
                   </div>
-                  <div class="agent-status-card active">
-                    <div class="agent-name">📊 Personalization Agent</div>
-                    <p class="agent-role">Dynamically shifts feature weights based on Subject P03 arm length.</p>
-                    <span class="badge badge-success">Running</span>
+                  <div class="agent-status-card">
+                    <div class="asc-icon"><i data-lucide="dna"></i></div>
+                    <div>
+                      <div class="agent-name">Personalization Coach</div>
+                      <p class="agent-role">Adjusts every score to your own strength baseline and body profile.</p>
+                      <span class="badge badge-success" id="personalizationAgentBadge">Ready</span>
+                    </div>
                   </div>
-                  <div class="agent-status-card active">
-                    <div class="agent-name">💡 Explanation Synthesizer</div>
-                    <p class="agent-role">Generates plain-language medical narratives from SHAP values.</p>
-                    <span class="badge badge-purple">Idle</span>
+                  <div class="agent-status-card">
+                    <div class="asc-icon"><i data-lucide="lightbulb"></i></div>
+                    <div>
+                      <div class="agent-name">Insight Translator</div>
+                      <p class="agent-role">Turns the AI model's math into a plain-language explanation.</p>
+                      <span class="badge badge-success" id="explainabilityAgentBadge">Ready</span>
+                    </div>
+                  </div>
+                  <div class="agent-status-card">
+                    <div class="asc-icon"><i data-lucide="brain-circuit"></i></div>
+                    <div>
+                      <div class="agent-name">Head Coach</div>
+                      <p class="agent-role">Weighs the safety threshold and delivers your final recommendation.</p>
+                      <span class="badge badge-success" id="decisionAgentBadge">Ready</span>
+                    </div>
                   </div>
                 </div>
-              </div>
             </div>
           </section>
 
         </div>
       </main>
     </div>
-    
+
     <script src="./src/main.js"></script>
   </body>
 </html>
