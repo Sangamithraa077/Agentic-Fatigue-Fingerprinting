@@ -27,6 +27,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from ml.models.common.callbacks import EarlyStopping, ModelCheckpoint
 from ml.models.common.config import TrainingConfig
+from ml.preprocessing.augmentation import TrainingDataAugmenter
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +106,14 @@ def train_model(
     y_val: np.ndarray,
     config: TrainingConfig,
     checkpoint_path: Optional[Path] = None,
+    augment_training: bool = True,
 ) -> TrainingHistory:
     """Train `model` with mini-batch SGD (Adam), early stopping, LR-on-plateau
     scheduling, and (optionally) best-epoch checkpointing.
+
+    Applies Gaussian-noise + amplitude-scaling augmentation to `X_train`
+    (train-only; `X_val` is never touched) when `augment_training=True`
+    (the default). This doubles the effective training set size.
 
     Args:
         model: A `torch.nn.Module` classifier (logits output, no softmax).
@@ -116,6 +122,9 @@ def train_model(
         config: Training hyperparameters (see `TrainingConfig`).
         checkpoint_path: If given, the best-validation-loss epoch's model
             weights are saved here via `torch.save`.
+        augment_training: If True (default), applies Gaussian noise +
+            amplitude scaling to X_train before training. Set False to
+            reproduce unaugmented behaviour.
 
     Returns:
         A `TrainingHistory` with per-epoch loss/accuracy curves.
@@ -127,6 +136,24 @@ def train_model(
     set_seed(config.random_seed)
     device = get_device(config.device)
     model.to(device)
+
+    # ------------------------------------------------------------------
+    # Augment training data ONLY (validation/test data is never touched)
+    # ------------------------------------------------------------------
+    if augment_training:
+        augmenter = TrainingDataAugmenter(
+            use_noise=True,
+            use_scaling=True,
+            use_warping=False,
+            noise_ratio=0.02,
+            scale_range=(0.95, 1.05),
+            seed=config.random_seed,
+        )
+        logger.info("Applying training-data augmentation (noise + scaling, multiplier=1) ...")
+        X_train, y_train = augmenter.augment(X_train, y_train, multiplier=1)
+        logger.info("Augmented training set size: %d samples.", len(y_train))
+    else:
+        logger.info("Training-data augmentation skipped (augment_training=False).")
 
     train_loader = _make_loader(X_train, y_train, config.batch_size, shuffle=True)
     val_loader = _make_loader(X_val, y_val, config.batch_size, shuffle=False)

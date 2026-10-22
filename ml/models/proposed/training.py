@@ -34,6 +34,7 @@ from ml.models.deep_learning.training import get_device, set_seed
 from ml.models.proposed.config import LossConfig, ProposedTrainingConfig
 from ml.models.proposed.losses import build_loss_function
 from ml.models.proposed.model import ProposedFatigueModel
+from ml.preprocessing.augmentation import TrainingDataAugmenter
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +119,17 @@ def train_proposed_model(
     training_config: ProposedTrainingConfig,
     loss_config: Optional[LossConfig] = None,
     checkpoint_path: Optional[Path] = None,
+    augment_training: bool = True,
 ) -> ProposedTrainingHistory:
     """Train `model` with mini-batch Adam, early stopping, LR-on-plateau
     scheduling, optional mixed precision (CUDA only), and best-epoch
     checkpointing.
+
+    Applies Gaussian-noise + amplitude-scaling augmentation to the
+    training split (train-only; validation data is never augmented) when
+    `augment_training=True` (the default). Each of the three modality
+    arrays is augmented independently with the same seed so that the
+    augmented rows still correspond to the same label in `y_train`.
 
     Mutates `model` in place: after training, `model`'s weights are the
     best-validation-loss epoch's weights, not necessarily the final
@@ -130,6 +138,27 @@ def train_proposed_model(
     set_seed(training_config.random_seed)
     device = get_device(training_config.device)
     model.to(device)
+
+    # ------------------------------------------------------------------
+    # Augment training data ONLY (validation/test data is never touched)
+    # ------------------------------------------------------------------
+    if augment_training:
+        augmenter = TrainingDataAugmenter(
+            use_noise=True,
+            use_scaling=True,
+            use_warping=False,   # warping disabled by default (can flip for experiments)
+            noise_ratio=0.02,
+            scale_range=(0.95, 1.05),
+            seed=training_config.random_seed,
+        )
+        logger.info("Applying training-data augmentation (noise + scaling, multiplier=1) ...")
+        x_emg_train, y_aug     = augmenter.augment(x_emg_train, y_train, multiplier=1)
+        x_imu_train, _         = augmenter.augment(x_imu_train, y_train, multiplier=1)
+        x_ppg_train, _         = augmenter.augment(x_ppg_train, y_train, multiplier=1)
+        y_train                 = y_aug
+        logger.info("Augmented training set size: %d samples (was %d).", len(y_train), len(y_train) // 2)
+    else:
+        logger.info("Training-data augmentation skipped (augment_training=False).")
 
     train_loader = _make_loader(x_emg_train, x_imu_train, x_ppg_train, y_train, training_config.batch_size, shuffle=True)
     val_loader = _make_loader(x_emg_val, x_imu_val, x_ppg_val, y_val, training_config.batch_size, shuffle=False)
