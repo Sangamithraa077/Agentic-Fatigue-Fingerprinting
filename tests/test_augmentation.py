@@ -71,3 +71,15 @@ def test_benchmark_augmentations():
     assert "noise_only" in results
     assert "scaling_only" in results
     assert results["unaugmented"].mae >= 0.0
+
+
+def test_training_augmentation_is_off_by_default():
+    """The LOPO study showed feature-space noise hurts generalization, and the committed
+    benchmark reports were produced unaugmented -- so neither trainer enables it unasked."""
+    import inspect
+
+    from ml.models.deep_learning.training import train_model
+    from ml.models.proposed.training import train_proposed_model
+
+    assert inspect.signature(train_model).parameters["augment_training"].default is False
+    assert inspect.signature(train_proposed_model).parameters["augment_training"].default is False

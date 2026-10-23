@@ -106,14 +106,21 @@ def train_model(
     y_val: np.ndarray,
     config: TrainingConfig,
     checkpoint_path: Optional[Path] = None,
-    augment_training: bool = True,
+    augment_training: bool = False,
 ) -> TrainingHistory:
     """Train `model` with mini-batch SGD (Adam), early stopping, LR-on-plateau
     scheduling, and (optionally) best-epoch checkpointing.
 
     Applies Gaussian-noise + amplitude-scaling augmentation to `X_train`
-    (train-only; `X_val` is never touched) when `augment_training=True`
-    (the default). This doubles the effective training set size.
+    (train-only; `X_val` is never touched) when `augment_training=True`.
+    This doubles the effective training set size.
+
+    Off by default: the committed benchmark reports were produced without
+    augmentation, and the leave-one-participant-out study in `research/` found
+    that noise injected into extracted feature tables *worsened* cross-athlete
+    generalization (LSTM MAE 2.48 -> 2.76 -> 2.85 Borg points). Treat
+    augmentation as an experiment to evaluate with `benchmark_augmentations`,
+    not a default benefit.
 
     Args:
         model: A `torch.nn.Module` classifier (logits output, no softmax).
@@ -122,9 +129,8 @@ def train_model(
         config: Training hyperparameters (see `TrainingConfig`).
         checkpoint_path: If given, the best-validation-loss epoch's model
             weights are saved here via `torch.save`.
-        augment_training: If True (default), applies Gaussian noise +
-            amplitude scaling to X_train before training. Set False to
-            reproduce unaugmented behaviour.
+        augment_training: If True, applies Gaussian noise + amplitude
+            scaling to X_train before training. Default False (see above).
 
     Returns:
         A `TrainingHistory` with per-epoch loss/accuracy curves.

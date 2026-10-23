@@ -119,7 +119,7 @@ def train_proposed_model(
     training_config: ProposedTrainingConfig,
     loss_config: Optional[LossConfig] = None,
     checkpoint_path: Optional[Path] = None,
-    augment_training: bool = True,
+    augment_training: bool = False,
 ) -> ProposedTrainingHistory:
     """Train `model` with mini-batch Adam, early stopping, LR-on-plateau
     scheduling, optional mixed precision (CUDA only), and best-epoch
@@ -127,9 +127,14 @@ def train_proposed_model(
 
     Applies Gaussian-noise + amplitude-scaling augmentation to the
     training split (train-only; validation data is never augmented) when
-    `augment_training=True` (the default). Each of the three modality
-    arrays is augmented independently with the same seed so that the
-    augmented rows still correspond to the same label in `y_train`.
+    `augment_training=True`. Each of the three modality arrays is augmented
+    independently with the same seed so that the augmented rows still
+    correspond to the same label in `y_train`.
+
+    Off by default: the committed benchmark reports were produced without
+    augmentation, and the leave-one-participant-out study in `research/` found
+    that noise injected into extracted feature tables worsened cross-athlete
+    generalization. Enable it only as an experiment you evaluate.
 
     Mutates `model` in place: after training, `model`'s weights are the
     best-validation-loss epoch's weights, not necessarily the final

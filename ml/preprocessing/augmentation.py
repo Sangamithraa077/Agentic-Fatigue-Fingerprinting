@@ -5,6 +5,15 @@ Strict adherence to PDF Rules:
 - Avoid shuffling window order, since muscular fatigue strictly progresses over time.
 - Implements: Gaussian jitter/noise, amplitude scaling, small time warping.
 - Evaluator to determine which augmentations improve generalization and which do not.
+
+Evidence before use: these transforms perturb *extracted feature tables*. In the
+project's leave-one-participant-out study (`research/results/final_synthesis_report.md`)
+exactly this kind of perturbation made cross-athlete generalization worse (LSTM MAE
+2.48 -> 2.76 Borg points with Gaussian noise), because it breaks relationships between
+features (e.g. RMS^2 = mean^2 + std^2) that real signals obey. The variant that helped
+in that study augmented the *raw signals* (magnitude warping) and recomputed features.
+Nothing in the training code enables this module by default; run
+`benchmark_augmentations` on your own data and keep only what it shows helps.
 """
 
 from __future__ import annotations

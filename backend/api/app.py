@@ -8,7 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 # Add project root directory to sys.path
 project_root = str(Path(__file__).resolve().parents[2])
@@ -23,10 +23,12 @@ from fastapi.security import APIKeyHeader  # type: ignore
 from fastapi.staticfiles import StaticFiles  # type: ignore
 from pydantic import BaseModel, Field  # type: ignore
 
+from backend.agents.data_agent import DataIntelligenceAgent
 from backend.agents.orchestrator import AgentOrchestrator
 from backend.api.replay_routes import router as replay_router
 from backend.services import replay_engine
 from ml.hardware.streaming_engine import StreamingWindowProcessor
+from ml.rag.evaluator import LLMLayerEvaluator
 from ml.rag.hybrid_router import HybridRouter
 from ml.rag.knowledge_retriever import LocalRAGKnowledgeBase
 from ml.rag.session_summary import build_session_summary_from_pipeline
@@ -73,90 +75,31 @@ if dashboard_dir.exists():
     app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
 
 # Global instances
-orchestrator = AgentOrchestrator()
 rag_kb = LocalRAGKnowledgeBase()
 hybrid_router = HybridRouter(knowledge_base=rag_kb)
 streaming_processor = StreamingWindowProcessor(router=hybrid_router)
 
-# Subject Profiles Database Mock (derived from WSD4FEDSRM metadata)
-SUBJECT_PROFILES: Dict[str, Dict[str, Any]] = {
-    "P01": {
-        "subject_id": "P01",
-        "sex": "Female",
-        "age": 31,
-        "height_cm": 165.0,
-        "weight_kg": 58.0,
-        "upperarm_length_cm": 31.5,
-        "mvic_force_n": 185.0,
-        "dominant_hand": "Right",
-    },
-    "P02": {
-        "subject_id": "P02",
-        "sex": "Female",
-        "age": 23,
-        "height_cm": 168.0,
-        "weight_kg": 61.0,
-        "upperarm_length_cm": 32.0,
-        "mvic_force_n": 192.0,
-        "dominant_hand": "Right",
-    },
-    "P03": {
-        "subject_id": "P03",
-        "sex": "Male",
-        "age": 26,
-        "height_cm": 178.0,
-        "weight_kg": 74.0,
-        "upperarm_length_cm": 34.2,
-        "mvic_force_n": 240.0,
-        "dominant_hand": "Right",
-    },
-    "P04": {
-        "subject_id": "P04",
-        "sex": "Male",
-        "age": 25,
-        "height_cm": 181.0,
-        "weight_kg": 79.0,
-        "upperarm_length_cm": 35.0,
-        "mvic_force_n": 255.0,
-        "dominant_hand": "Right",
-    },
-    "P05": {
-        "subject_id": "P05",
-        "sex": "Female",
-        "age": 21,
-        "height_cm": 162.0,
-        "weight_kg": 54.0,
-        "upperarm_length_cm": 30.8,
-        "mvic_force_n": 175.0,
-        "dominant_hand": "Right",
-    },
-    "P06": {
-        "subject_id": "P06",
-        "sex": "Male",
-        "age": 26,
-        "height_cm": 175.0,
-        "weight_kg": 71.0,
-        "upperarm_length_cm": 33.5,
-        "mvic_force_n": 225.0,
-        "dominant_hand": "Right",
-    },
-}
+# Name reported to the explanation layer for the models that actually produce
+# the numbers it is asked to explain.
+EXPLAINED_MODEL_NAME = "RandomForest (fatigue probability) + Ridge regression (Borg RPE)"
+
 
 class AnalysisRequest(BaseModel):
     """Request body for `/api/agents/analyze`.
 
-    `predicted_rpe` and `shap_values` are only used as a fallback when
-    `subject_id`/`step` do not resolve to an already-built replay session
-    (see `run_agent_analysis`) -- whenever a session is available, the
-    endpoint recomputes both from the real trained model and SHAP
-    explainer itself, rather than trusting client-supplied numbers.
+    `predicted_rpe` and `shap_values` are only used when `subject_id`/`step`
+    do not resolve to an already-built replay session (see
+    `run_agent_analysis`) -- whenever a session is available, the endpoint
+    recomputes both from the real trained models and SHAP explainer itself,
+    rather than trusting client-supplied numbers. With neither a session nor
+    an explicit `predicted_rpe`, the request is rejected: nothing is invented.
     """
 
     subject_id: str = Field(default="P01", description="Subject identifier (e.g., P01 to P34)")
     step: Optional[int] = Field(default=None, description="Replay step index this analysis corresponds to")
-    threshold: float = Field(default=15.0, description="Borg RPE proxy threshold the Decision and Reporting Agent applies for this request")
-    predicted_rpe: Optional[float] = Field(default=None, description="Fallback Borg RPE proxy, used only if no replay session is available")
-    shap_values: Optional[Dict[str, float]] = Field(default=None, description="Fallback SHAP attributions, used only if no replay session is available")
+    threshold: float = Field(default=15.0, description="Borg RPE threshold the Decision and Reporting Agent applies for this request")
+    predicted_rpe: Optional[float] = Field(default=None, description="Caller-supplied Borg RPE, used only if no replay session is available")
+    shap_values: Optional[Dict[str, float]] = Field(default=None, description="Caller-supplied SHAP attributions, used only if no replay session is available")
 
 
 @app.get("/api/health")
@@ -179,41 +122,46 @@ def run_agent_analysis(req: AnalysisRequest):
     cached (i.e. the dashboard has an active replay stream open for this
     subject), the analysis context -- signals, predicted fatigue estimate,
     SHAP attributions, subject profile -- is recomputed directly from that
-    real session rather than taken from the request body.
+    real session rather than taken from the request body. Without a session
+    the caller must supply `predicted_rpe` explicitly (HTTP 409 otherwise),
+    and no raw signals are fabricated for the signal audit.
     """
     subject_profile: Dict[str, float] = {}
-    predicted_rpe = req.predicted_rpe or 16.4
+    predicted_rpe = req.predicted_rpe
     shap_values = req.shap_values or {}
-    raw_signals = {
-        "emg": np.zeros((1000, 3)),
-        "imu": np.zeros((100, 3)),
-        "ppg": np.zeros((200, 1)),
-    }
+    raw_signals: Dict[str, Any] = {}
 
     session = replay_engine.get_cached_session(req.subject_id) if req.step is not None else None
+    if session is None and predicted_rpe is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"No active replay session for {req.subject_id!r}. Open the athlete in the dashboard "
+                "(or pass an explicit predicted_rpe) before requesting an analysis."
+            ),
+        )
+
     if session is not None:
         step_data = replay_engine.compute_replay_step(session, req.step)
 
-        predicted_rpe = step_data["prediction"]["estimated_rpe_proxy"]
+        prediction = step_data["prediction"]
+        predicted_rpe = prediction.get("estimated_rpe", {}).get("value", prediction["estimated_rpe_proxy"])
         shap_values = {f["feature"]: f["shap"] for f in step_data["explainability"]["local_top_features"]}
         profile = step_data["personalization"]["profile"]
+        # Only what the athlete's real profile contains; missing fields stay absent
+        # (the agent reports them as n/a) instead of being filled with placeholders.
+        demographic, mvic = profile["demographic"] or {}, profile["mvic"] or {}
         subject_profile = {
-            "sex": (profile["demographic"] or {}).get("sex", "unknown"),
-            "age": (profile["demographic"] or {}).get("age", 0),
-            "upperarm_length_cm": 0.0,
-            "mvic_force_n": (profile["mvic"] or {}).get("er_mean_n", 0.0),
+            key: value
+            for key, value in {
+                "sex": demographic.get("sex"),
+                "age": demographic.get("age"),
+                "mvic_force_n": mvic.get("er_mean_n"),
+            }.items()
+            if value is not None
         }
 
-        emg = step_data["signals"]["emg"]["channels"]
-        emg_arrays = [v for v in emg.values() if v]
-        if emg_arrays:
-            raw_signals["emg"] = np.array(emg_arrays).T
-        imu = step_data["signals"]["imu"]
-        if "acc_x" in imu:
-            raw_signals["imu"] = np.array([imu["acc_x"], imu["acc_y"], imu["acc_z"]]).T
-        ppg = step_data["signals"]["ppg"]
-        if ppg and ppg.get("values"):
-            raw_signals["ppg"] = np.array(ppg["values"]).reshape(-1, 1)
+        raw_signals = _signals_from_step(step_data)
 
     context = {
         "subject_id": req.subject_id,
@@ -244,18 +192,91 @@ def run_agent_analysis(req: AnalysisRequest):
 
 
 class RAGExplainRequest(BaseModel):
-    subject_id: str = Field(default="P03")
-    current_rpe: float = Field(default=16.4)
-    previous_rpe: Optional[float] = Field(default=14.8)
-    time_span_seconds: float = Field(default=180.0)
+    """Request body for `/api/rag/explain`.
+
+    With `step` and an active replay session, every number in the
+    explanation (Borg estimate, trend, SHAP drivers, baseline deviations,
+    signal-quality flags) is recomputed from that real window. The explicit
+    `current_rpe`/`previous_rpe`/`shap_values` fields are only honoured when
+    there is no session; with neither, the request is rejected.
+    """
+
+    subject_id: str = Field(default="P01")
+    step: Optional[int] = Field(default=None, description="Replay step index to ground the explanation in")
     user_query: Optional[str] = Field(default=None)
-    shap_values: Optional[Dict[str, float]] = Field(
-        default={
-            "EMG_MDF_AntDeltoid": 3.20,
-            "IMU_Jerk_UpperArm": 1.80,
-            "PPG_HeartRate": -0.40,
+    current_rpe: Optional[float] = Field(default=None, description="Caller-supplied Borg RPE (no-session use only)")
+    previous_rpe: Optional[float] = Field(default=None)
+    time_span_seconds: Optional[float] = Field(default=None)
+    shap_values: Optional[Dict[str, float]] = Field(default=None)
+
+
+def _signals_from_step(step_data: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    """Rebuild the raw-signal arrays the Data Intelligence Agent audits from a replay step."""
+    signals: Dict[str, np.ndarray] = {}
+    emg_arrays = [v for v in step_data["signals"]["emg"]["channels"].values() if v]
+    if emg_arrays:
+        signals["emg"] = np.array(emg_arrays).T
+    imu = step_data["signals"]["imu"]
+    if "acc_x" in imu:
+        signals["imu"] = np.array([imu["acc_x"], imu["acc_y"], imu["acc_z"]]).T
+    ppg = step_data["signals"]["ppg"]
+    if ppg and ppg.get("values"):
+        signals["ppg"] = np.array(ppg["values"]).reshape(-1, 1)
+    return signals
+
+
+def _grounded_rag_inputs(req: RAGExplainRequest) -> Dict[str, Any]:
+    """Resolve the real numbers the explanation may cite, or raise HTTP 409."""
+    session = replay_engine.get_cached_session(req.subject_id) if req.step is not None else None
+
+    if session is None:
+        if req.current_rpe is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"No active replay session for {req.subject_id!r}. Open the athlete in the dashboard "
+                    "(or pass an explicit current_rpe) before requesting an explanation."
+                ),
+            )
+        return {
+            "current_rpe": req.current_rpe,
+            "previous_rpe": req.previous_rpe,
+            "time_span_seconds": req.time_span_seconds if req.time_span_seconds is not None else 0.0,
+            "shap_values": req.shap_values or {},
+            "baseline_deviations": {},
+            "quality_warnings": ["CALLER_SUPPLIED_VALUES_NOT_VERIFIED"],
+            "grounding": {"source": "caller_supplied"},
         }
-    )
+
+    step_data = replay_engine.compute_replay_step(session, req.step)
+    prediction = step_data["prediction"]
+    borg = prediction.get("borg_regression", {})
+    rpe_source = prediction.get("estimated_rpe", {}).get("source", "rf_probability_proxy")
+    current_rpe = prediction.get("estimated_rpe", {}).get("value", prediction["estimated_rpe_proxy"])
+
+    flags: List[str] = []
+    previous_rpe: Optional[float] = None
+    time_span = float(step_data["elapsed_seconds"])
+    if borg.get("available") and borg.get("previous_value") is not None:
+        previous_rpe = borg["previous_value"]
+        time_span = borg["sequence_end_s"] - borg["previous_sequence_end_s"]
+    else:
+        flags.append("TREND_UNAVAILABLE_INSUFFICIENT_HISTORY")
+    if rpe_source != "ridge_lopo":
+        flags.append("RPE_IS_PROBABILITY_PROXY_NOT_REGRESSION")
+
+    audit = DataIntelligenceAgent().process({"raw_signals": _signals_from_step(step_data)})
+    flags.extend(audit.warnings or ([] if audit.success else ["SIGNAL_AUDIT_FAILED"]))
+
+    return {
+        "current_rpe": current_rpe,
+        "previous_rpe": previous_rpe,
+        "time_span_seconds": time_span,
+        "shap_values": {f["feature"]: f["shap"] for f in step_data["explainability"]["local_top_features"]},
+        "baseline_deviations": step_data["personalization"].get("feature_baseline_zscores", {}),
+        "quality_warnings": flags or None,  # None -> summary reports the (now real) clean audit
+        "grounding": {"source": "replay_session", "step": step_data["step"], "rpe_source": rpe_source},
+    }
 
 
 @app.get("/api/rag/sources")
@@ -279,14 +300,16 @@ def get_rag_sources():
 @app.post("/api/rag/explain")
 def get_rag_explanation(req: RAGExplainRequest):
     """Executes Selective RAG-grounded explanation with the Number Verifier guardrail (Modules 9 & 10)."""
+    inputs = _grounded_rag_inputs(req)
     summary = build_session_summary_from_pipeline(
         person_id=req.subject_id,
-        current_rpe=req.current_rpe,
-        previous_rpe=req.previous_rpe,
-        time_span_seconds=req.time_span_seconds,
-        shap_values=req.shap_values or {},
-        baseline_deviations={"EMG_MDF": -18.5, "IMU_Jerk": 22.0},
-        model_name="CrossModalAttention_v2",
+        current_rpe=inputs["current_rpe"],
+        previous_rpe=inputs["previous_rpe"],
+        time_span_seconds=inputs["time_span_seconds"],
+        shap_values=inputs["shap_values"],
+        baseline_deviations=inputs["baseline_deviations"],
+        quality_warnings=inputs["quality_warnings"],
+        model_name=EXPLAINED_MODEL_NAME,
     )
 
     resp = hybrid_router.explain(summary, user_query=req.user_query, force_trigger=True)
@@ -299,6 +322,7 @@ def get_rag_explanation(req: RAGExplainRequest):
         "execution_time_ms": round(resp.execution_time_ms, 2),
         "disclaimer": resp.disclaimer,
         "session_summary": summary.to_dict(),
+        "grounding": inputs["grounding"],
         "llm_backend": hybrid_router._llm_backend,
         "kb_backend": rag_kb.retrieval_backend,
     }
@@ -329,14 +353,18 @@ async def _sse_event_generator(subject_id: str, max_frames: int = 120) -> AsyncG
 
         emg_rms = float(np.sqrt(np.mean(emg_pkt.data ** 2))) if emg_pkt is not None else 0.0
         imu_acc = float(np.mean(np.linalg.norm(imu_pkt.data[:, :3], axis=1))) if imu_pkt is not None else 9.81
-        ppg_bpm = float(70.0 + (emg_rms * 50.0))
+        ppg_pkt = frame.get("PPG")
+        ppg_mean = float(np.mean(ppg_pkt.data)) if ppg_pkt is not None else None
 
         payload = {
             "subject_id": subject_id,
+            # Hardware-simulator stream used to exercise the ESP32 packet contract
+            # (docs/hardware_contract.md); not recorded athlete data.
+            "source": "hardware_simulator",
             "timestamp_s": round(time.time(), 3),
             "emg_rms_mean": round(emg_rms, 4),
             "imu_acc_magnitude": round(imu_acc, 4),
-            "ppg_bpm_estimate": round(ppg_bpm, 1),
+            "ppg_mean": None if ppg_mean is None else round(ppg_mean, 4),
             "smoothed_fatigue_index": round(streaming_processor.get_smoothed_fatigue_index(), 2),
             "window_count": streaming_processor.window_count,
             "fault_flags": emg_pkt.quality_flag if emg_pkt else "OK",
@@ -370,34 +398,42 @@ async def live_stream_signals(subject_id: str, max_frames: int = 120):
 
 @app.get("/api/reports/metrics")
 def get_model_metrics():
-    """Returns the latest model evaluation metrics for the dashboard.
+    """Returns evaluation metrics measured from this project's own runs.
 
-    Reads from reports/ directory if available; returns reference values otherwise.
+    `loso_metrics` come from `reports/evaluation_metrics.json`, which is
+    generated from the research study's leave-one-participant-out results
+    (`research/build_evaluation_metrics.py`). If that file is absent the
+    section is returned empty with `source: "unavailable"` -- no placeholder
+    benchmark numbers are ever substituted. `rag_metrics` are measured live
+    against the loaded knowledge base.
     """
-    reports_dir = Path(__file__).resolve().parents[2] / "reports"
-    metrics_file = reports_dir / "evaluation_metrics.json"
-
+    metrics_file = Path(__file__).resolve().parents[2] / "reports" / "evaluation_metrics.json"
     if metrics_file.exists():
-        import json as _json
-        return _json.loads(metrics_file.read_text(encoding="utf-8"))
+        report = json.loads(metrics_file.read_text(encoding="utf-8"))
+    else:
+        report = {"source": "unavailable", "loso_metrics": {}}
 
-    # Reference values from paper benchmarks (used until real training run completes)
-    return {
-        "source": "reference_benchmarks",
-        "loso_metrics": {
-            "proposed_model": {"mae": 1.42, "rmse": 1.87, "r2": 0.81, "within_1rpe_pct": 71.2},
-            "svm_baseline": {"mae": 2.31, "rmse": 2.95, "r2": 0.62, "within_1rpe_pct": 52.4},
-            "mean_baseline": {"mae": 3.84, "rmse": 4.52, "r2": 0.11, "within_1rpe_pct": 28.7},
-            "elapsed_time_baseline": {"mae": 2.97, "rmse": 3.61, "r2": 0.39, "within_1rpe_pct": 41.1},
-        },
-        "rag_metrics": {
-            "faithfulness_rate": 1.0,
-            "top3_retrieval_recall": 1.0,
+    report["rag_metrics"] = _measure_rag_metrics()
+    report["llm_backend"] = hybrid_router._llm_backend
+    return report
+
+
+_RAG_METRICS_CACHE: Optional[Dict[str, Any]] = None
+
+
+def _measure_rag_metrics() -> Dict[str, Any]:
+    """Retrieval recall measured now, on the loaded knowledge base (cached per process)."""
+    global _RAG_METRICS_CACHE
+    if _RAG_METRICS_CACHE is None:
+        recall_top1, recall_top3 = LLMLayerEvaluator(rag_kb).evaluate_retrieval_quality()
+        _RAG_METRICS_CACHE = {
+            "retrieval_recall_top1_pct": round(recall_top1, 1),
+            "retrieval_recall_top3_pct": round(recall_top3, 1),
+            "retrieval_queries_evaluated": LLMLayerEvaluator.RETRIEVAL_TEST_QUERY_COUNT,
             "knowledge_chunk_count": len(rag_kb.chunks),
             "retrieval_backend": rag_kb.retrieval_backend,
-        },
-        "llm_backend": hybrid_router._llm_backend,
-    }
+        }
+    return _RAG_METRICS_CACHE
 
 
 if __name__ == "__main__":

@@ -60,17 +60,17 @@ Applied in order, toggleable via `PPGPreprocessingConfig`:
 
 EMG (1000 Hz), IMU (100 Hz), and PPG (200 Hz) are each processed at their native rate. `resampling.py` provides `resample_signal`/`align_signal_length` utilities that a modality config can opt into (`target_sampling_rate_hz`) if a future phase needs a modality resampled for its own purposes — but **no config enables this by default**, and nothing in this phase aligns modalities onto a shared timebase. That alignment is explicitly deferred to the future multimodal fusion phase.
 
-## Training Data Augmentation (In-Memory)
+## Training Data Augmentation (Optional, Off by Default)
 
 Implemented in `ml/preprocessing/augmentation.py`:
-- **`TrainingDataAugmenter`**: Provides lightweight, time-series-aware augmentation transforms for training splits to improve model generalization and prevent overfitting:
-  - **Additive Gaussian Noise (Jitter)**: Injects small, zero-mean Gaussian perturbation proportional to standard deviation (`noise_std=0.01` default) to simulate physiological micro-variations and electrode noise.
-  - **Magnitude Scaling**: Multiplies segments by random scaling factors within `(0.95, 1.05)` to simulate slight shifts in electrode contact impedance or contraction intensity.
+- **`TrainingDataAugmenter`**: Optional augmentation transforms for training splits:
+  - **Additive Gaussian Noise (Jitter)**: Injects zero-mean Gaussian perturbation proportional to each feature's standard deviation (`noise_ratio=0.02` default).
+  - **Magnitude Scaling**: Multiplies samples by random scaling factors within `(0.95, 1.05)`.
   - **Time Warping**: Optional non-linear temporal stretching/compression (default off to preserve monotonic fatigue timing).
-- **Zero Disk Overhead & Zero Data Leakage**:
-  - Augmentation is executed strictly **in-memory, on-the-fly** within `train_model()` and `train_proposed_model()` right before PyTorch `DataLoader` creation.
-  - Validation, test, and held-out LOSO subject splits are **never augmented**, guaranteeing pristine and uncontaminated evaluation metrics.
-  - No separate augmented dataset files are needed or saved to disk.
+- **Leakage-safe by construction**:
+  - Augmentation runs strictly **in-memory, on-the-fly** within `train_model()` and `train_proposed_model()` right before PyTorch `DataLoader` creation, only when called with `augment_training=True`.
+  - Validation, test, and held-out LOSO subject splits are **never augmented**, and no augmented dataset files are written to disk.
+- **Evidence it does not help by default.** These transforms act on *extracted feature tables*. In the project's leave-one-participant-out study ([`research/results/final_synthesis_report.md`](../research/results/final_synthesis_report.md)), feature-space noise made cross-athlete generalization worse (LSTM MAE 2.48 -> 2.76 Borg points) because it breaks relationships between features that real signals obey. The only variant that helped augmented the **raw signals** (magnitude warping) and recomputed features through the pipeline. Hence `augment_training` defaults to `False`; use `benchmark_augmentations` to test any transform on your own data before enabling it.
 
 ## Validation
 

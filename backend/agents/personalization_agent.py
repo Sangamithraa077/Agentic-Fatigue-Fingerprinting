@@ -10,7 +10,7 @@ The agent:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -23,6 +23,18 @@ try:
     _PERSONALIZATION_AVAILABLE = True
 except ImportError:
     _PERSONALIZATION_AVAILABLE = False
+
+
+def _describe_subject(sex, age, arm_length_cm, mvic_force_n) -> str:
+    """Human-readable subject summary that says "n/a" for anything not supplied."""
+    return ", ".join(
+        [
+            str(sex) if sex else "sex n/a",
+            f"{age}y" if age is not None else "age n/a",
+            f"Arm: {arm_length_cm}cm" if arm_length_cm else "Arm: n/a",
+            f"MVIC: {mvic_force_n}N" if mvic_force_n else "MVIC: n/a",
+        ]
+    )
 
 
 class PersonalizationAgent(BaseAgent):
@@ -49,10 +61,12 @@ class PersonalizationAgent(BaseAgent):
         subject_profile = context.get("subject_profile", {})
         population_rpe = context.get("population_rpe", 6.0)
 
-        sex = subject_profile.get("sex", "Unknown")
-        age = subject_profile.get("age", 25)
-        arm_length_cm = subject_profile.get("upperarm_length_cm", 34.0)
-        mvic_force_n = subject_profile.get("mvic_force_n", 200.0)
+        # Anything the caller did not supply stays None and is reported as "n/a";
+        # no age, arm length, or strength is ever assumed.
+        sex = subject_profile.get("sex")
+        age = subject_profile.get("age")
+        arm_length_cm = subject_profile.get("upperarm_length_cm")
+        mvic_force_n = subject_profile.get("mvic_force_n")
 
         # Feature baseline (mean/std arrays) may be passed in context for data-driven adjustment
         baseline_means: Optional[np.ndarray] = context.get("baseline_feature_means")
@@ -92,8 +106,7 @@ class PersonalizationAgent(BaseAgent):
                 personalization_method = "data_driven_z_score"
 
                 narrative = (
-                    f"Personalisation Applied for Subject {subject_id} ({sex}, {age}y, "
-                    f"Arm: {arm_length_cm}cm, MVIC: {mvic_force_n}N):\n"
+                    f"Personalisation Applied for Subject {subject_id} ({_describe_subject(sex, age, arm_length_cm, mvic_force_n)}):\n"
                     f"Population RPE: {population_rpe:.2f} → Data-Driven Personalised RPE: {personalized_rpe:.2f} "
                     f"(offset {personalized_offset:+.2f}). "
                     f"Baseline deviation z-score: {deviation_score:.2f} "
@@ -136,9 +149,14 @@ class PersonalizationAgent(BaseAgent):
         )
 
     def _mvic_heuristic(
-        self, population_rpe: float, mvic_force_n: float
+        self, population_rpe: float, mvic_force_n: Optional[float]
     ):
-        """Original MVIC strength-factor offset formula (zero-baseline fallback)."""
+        """Original MVIC strength-factor offset formula (zero-baseline fallback).
+
+        With no MVIC measurement there is nothing to adjust by, so the population
+        value is returned unchanged rather than assuming a strength."""
+        if not mvic_force_n:
+            return max(6.0, min(20.0, population_rpe)), 0.0
         strength_factor = (mvic_force_n - 200.0) / 200.0
         personalized_offset = -0.4 * strength_factor
         personalized_rpe = max(6.0, min(20.0, population_rpe + personalized_offset))
@@ -149,8 +167,7 @@ class PersonalizationAgent(BaseAgent):
         population_rpe, personalized_rpe, personalized_offset
     ) -> str:
         return (
-            f"Personalisation Applied for Subject {subject_id} ({sex}, {age}y, "
-            f"Arm: {arm_length_cm}cm, MVIC: {mvic_force_n}N):\n"
+            f"Personalization Applied for Subject {subject_id} ({_describe_subject(sex, age, arm_length_cm, mvic_force_n)}):\n"
             f"Population Baseline RPE ({population_rpe:.2f}) adjusted by {personalized_offset:+.2f} "
             f"offset to Personalized RPE: {personalized_rpe:.2f}."
         )

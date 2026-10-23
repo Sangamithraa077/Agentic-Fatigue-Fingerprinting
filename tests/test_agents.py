@@ -148,3 +148,20 @@ def test_agent_orchestrator_pipeline():
     assert pipeline_results["data_agent"].success is True
     assert pipeline_results["decision_agent"].data["final_rpe"] > 0
     assert "formatted_report" in pipeline_results["decision_agent"].data
+
+
+def test_data_intelligence_agent_does_not_certify_an_empty_input():
+    result = DataIntelligenceAgent().process({"raw_signals": {}})
+    assert result.success is True
+    assert result.data["imu_status"] == "NOT_PROVIDED"
+    assert "skipped" in result.narrative.lower()
+    assert "certified" not in result.narrative.lower()
+    assert len(result.warnings) == 1
+
+
+def test_personalization_agent_reports_missing_profile_data_as_not_available():
+    result = PersonalizationAgent().process({"subject_id": "P05", "population_rpe": 12.0, "subject_profile": {}})
+    assert result.data["arm_length_cm"] is None and result.data["mvic_force_n"] is None
+    assert result.data["personalized_offset"] == 0.0 and result.data["personalized_rpe"] == 12.0
+    assert "n/a" in result.narrative
+    assert "34.0" not in result.narrative and "25y" not in result.narrative  # no assumed arm length or age

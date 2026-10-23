@@ -29,6 +29,23 @@ class DataIntelligenceAgent(BaseAgent):
         ppg_quality = context.get("ppg_quality")
         raw_signals = context.get("raw_signals", {})
 
+        # Nothing to audit: say so plainly instead of "certifying" an empty input.
+        if not any(raw_signals.get(key) is not None for key in ("emg", "imu", "ppg")):
+            message = "No raw signal data was supplied with this request; signal audit skipped."
+            return self._create_result(
+                success=True,
+                data={
+                    "is_viable": True,
+                    "valid_emg_channels": 0,
+                    "imu_status": "NOT_PROVIDED",
+                    "ppg_status": "NOT_PROVIDED",
+                    "warnings_count": 1,
+                },
+                narrative=message,
+                warnings=[message],
+                execution_time_ms=(time.time() - start_time) * 1000.0,
+            )
+
         # 1. Audit sEMG channels
         emg_channels_valid = 0
         if raw_signals.get("emg") is not None:

@@ -39,6 +39,7 @@ from ml.explainability.global_explainer import GlobalExplanation, explain_global
 from ml.explainability.local_explainer import explain_prediction
 from ml.feature_engineering.feature_dataset import build_feature_datasets
 from ml.feature_engineering.feature_pipeline import FeaturePipeline
+from ml.models.borg_regression import BorgEstimateTable, build_estimate_table, condition_key
 from ml.models.common.dataset_builder import ModelingDataset, apply_scaler, build_modeling_dataset, derive_target
 from ml.personalization.baseline_builder import ModalityBaseline, build_modality_baseline
 from ml.personalization.config import PersonalizationConfig
@@ -59,6 +60,17 @@ PPG_DISPLAY_SECONDS = 4.0
 DISPLAY_EMG_MUSCLES = (EMGMuscle.ANTERIOR_DELTOID, EMGMuscle.INFRASPINATUS, EMGMuscle.LATISSIMUS_DORSI)
 DISPLAY_IMU_LOCATION = IMULocation.UPPER_ARM
 
+BORG_REGRESSION_MODEL_NAME = "Ridge regression (trained on the other 33 athletes)"
+# Pooled out-of-sample MAE of that model across all 34 held-out athletes in the
+# research study (reproduced by tests/test_borg_regression.py). The honest
+# "typical error" to show next to any single estimate.
+STUDY_POOLED_LOPO_MAE = 2.31
+
+# Features whose deviation from the athlete's own baseline is reported on every
+# window: RMS (how hard the muscle is working) and median frequency (which
+# drifts down as a muscle tires).
+ALWAYS_REPORTED_ZSCORE_FEATURES = ("rms", "median_frequency")
+
 PERSONALIZATION_CONFIG = PersonalizationConfig()
 RANKING_CONFIG = FeatureRankingConfig(top_k=10)
 SHAP_CONFIG = ShapConfig(max_explain_samples=200)
@@ -78,6 +90,9 @@ class SubjectSession:
     profile: SubjectProfile
     emg_baseline: ModalityBaseline
     global_explanation: GlobalExplanation
+    # Out-of-sample Borg RPE estimates (Ridge fitted on the other 33 athletes);
+    # None if this athlete has no sequences in the research study dataset.
+    borg_table: Optional[BorgEstimateTable] = None
 
 
 _SESSION_CACHE: Dict[str, SubjectSession] = {}
@@ -129,11 +144,14 @@ def _build_session(subject_id: str) -> SubjectSession:
     X_scaled = apply_scaler(bundle.scaler, modeling_dataset.X)
     global_explanation = explain_global(bundle.shap_bundle, X_scaled, modeling_dataset.feature_names, SHAP_CONFIG, RANKING_CONFIG)
 
+    borg_table = build_estimate_table(subject_id)
+
     logger.info("Session ready for '%s': %d replay steps.", subject_id, len(replay_row_indices))
     return SubjectSession(
         subject_id=subject_id, subject=subject, processed=processed, features=features,
         modeling_dataset=modeling_dataset, aligned_metadata=aligned_metadata, replay_row_indices=replay_row_indices,
         profile=profile, emg_baseline=emg_baseline, global_explanation=global_explanation,
+        borg_table=borg_table,
     )
 
 
@@ -187,6 +205,52 @@ def _ppg_slice(processed_condition, elapsed_seconds: float) -> Optional[Dict[str
     return {"sampling_rate_hz": rate, "values": signal.values[start_sample:end_sample].tolist()}
 
 
+def _borg_regression_block(
+    session: SubjectSession, direction: str, intensity_band: str, elapsed_seconds: float
+) -> Dict[str, Any]:
+    """Out-of-sample Ridge Borg estimate for this moment of the replay, or an
+    explicit "not available yet" block -- never a made-up number.
+
+    The study's sequences are 3 consecutive 5 s windows, so the first
+    estimate for a condition exists only once ~30 s of that condition have
+    been replayed.
+    """
+    block: Dict[str, Any] = {
+        "available": False,
+        "model": BORG_REGRESSION_MODEL_NAME,
+        "typical_error_borg": STUDY_POOLED_LOPO_MAE,
+        "trained_on_athletes": None,
+    }
+    table = session.borg_table
+    if table is None:
+        block["reason"] = "no_study_data"
+        return block
+
+    block["trained_on_athletes"] = table.n_training_participants
+    block["alpha"] = table.alpha
+    condition = condition_key(direction, intensity_band)
+    hit = table.lookup(condition, elapsed_seconds)
+    if hit is None:
+        block["reason"] = "warming_up"
+        block["available_from_s"] = table.first_estimate_available_s(condition)
+        return block
+
+    block.update({"available": True, **hit})
+    return block
+
+
+def _feature_baseline_zscores(session: SubjectSession, raw_by_feature: Dict[str, float], features) -> Dict[str, float]:
+    """How far each listed feature sits from this athlete's own mean, in their own
+    standard deviations -- from the already-built `ModalityBaseline`."""
+    means, stds = session.emg_baseline.feature_means, session.emg_baseline.feature_stds
+    zscores: Dict[str, float] = {}
+    for name in features:
+        std = stds.get(name, 0.0)
+        if std > 0 and name in means and name in raw_by_feature:
+            zscores[name] = float((raw_by_feature[name] - means[name]) / std)
+    return zscores
+
+
 def compute_replay_step(session: SubjectSession, step: int) -> Dict[str, Any]:
     """Compute one real, fully-explained replay window -- the payload streamed to the dashboard."""
     bundle = model_service.get_model_bundle()
@@ -227,6 +291,14 @@ def compute_replay_step(session: SubjectSession, step: int) -> Dict[str, Any]:
 
     rpe_nearest = meta["rpe_nearest"]
 
+    rpe_proxy = round(6.0 + probability_fatigued * 14.0, 1)
+    borg_regression = _borg_regression_block(session, meta["direction"], meta["intensity_band"], elapsed_seconds)
+    estimated_rpe = (
+        {"value": round(borg_regression["value"], 1), "source": "ridge_lopo"}
+        if borg_regression["available"]
+        else {"value": rpe_proxy, "source": "rf_probability_proxy"}
+    )
+
     return {
         "step": step,
         "total_steps": n_steps,
@@ -249,7 +321,12 @@ def compute_replay_step(session: SubjectSession, step: int) -> Dict[str, Any]:
             # Linear proxy onto the Borg 6-20 scale, derived solely from the
             # real classifier's own probability -- not a separate regression
             # model. Documented in docs/replay_dashboard.md.
-            "estimated_rpe_proxy": round(6.0 + probability_fatigued * 14.0, 1),
+            "estimated_rpe_proxy": rpe_proxy,
+            # The Borg RPE figure the rest of the system uses: the Ridge
+            # regression's out-of-sample estimate once it exists, otherwise
+            # the probability proxy above (clearly tagged by `source`).
+            "estimated_rpe": estimated_rpe,
+            "borg_regression": borg_regression,
         },
         "explainability": {
             "local_top_features": [
@@ -267,6 +344,11 @@ def compute_replay_step(session: SubjectSession, step: int) -> Dict[str, Any]:
             "generic_probability": personalized.global_probability,
             "personalized_probability": personalized.personalized_probability,
             "baseline_deviation_score": personalized.baseline_deviation_score,
+            "feature_baseline_zscores": _feature_baseline_zscores(
+                session, raw_by_feature,
+                # the plain-language "muscle effort" / "tiredness sign" tiles always need these two
+                list(dict.fromkeys([*ALWAYS_REPORTED_ZSCORE_FEATURES, *(c.feature_name for c in local.top_contributions)])),
+            ),
             "profile": {
                 "demographic": None
                 if demographic is None
