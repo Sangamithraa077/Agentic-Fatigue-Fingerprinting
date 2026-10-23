@@ -11,7 +11,7 @@ built on multimodal wearable sensor data (EMG · IMU · PPG).**
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="requirements.txt"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-blue.svg"></a>
   <a href="dashboard/package.json"><img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933.svg"></a>
-  <img alt="Tests" src="https://img.shields.io/badge/tests-345%20passing-brightgreen.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-376%20passing-brightgreen.svg">
   <a href="https://github.com/Sangamithraa077/Agentic-Fatigue-Fingerprinting/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/Sangamithraa077/Agentic-Fatigue-Fingerprinting.svg"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
@@ -43,7 +43,9 @@ It's built for anyone who needs to understand fatigue as it happens, not after t
 | **Researchers** | A full, reproducible ML pipeline — preprocessing through personalization — built on real wearable sensor data. |
 | **Engineers** | A reference architecture for explainable, personalized, agent-orchestrated biomedical time-series AI. |
 
-Every number on the dashboard is real. There is no synthetic data, no mocked prediction, and no fallback simulation anywhere in the live product — if the backend is unreachable, the interface says so, honestly, instead of making something up.
+Every number on the dashboard comes from a real recording and a real model. There is no mocked prediction and no fallback simulation anywhere in the live product — if the backend is unreachable, or a figure isn't available yet, the interface says so instead of making something up. (The one synthetic data source is the hardware packet simulator in `ml/hardware/`, which exists to test the ESP32 sensor contract and is reachable only through `/api/signals/live`; the dashboard never uses it.)
+
+It also reports its own limits. The Borg RPE estimate is a research-grade indication — its typical error is about 2.3 points on a 6–20 scale, close to what guessing the average would give (see [Model Details](#model-details)).
 
 ---
 
@@ -52,7 +54,9 @@ Every number on the dashboard is real. There is no synthetic data, no mocked pre
 **AI & Machine Learning**
 - Classical (Logistic Regression, SVM, Random Forest, XGBoost) and deep learning (1D-CNN, BiLSTM, CNN-BiLSTM, TCN) fatigue models, benchmarked under one identical, leakage-safe evaluation protocol
 - A multimodal cross-modal attention architecture that fuses EMG, IMU, and PPG into a single shared representation
-- On-the-fly in-memory training data augmentation (Gaussian noise jittering, magnitude scaling, and time warping) to combat overfitting without disk overhead or data leakage
+- A leave-one-participant-out Ridge regression that estimates Borg RPE directly; every athlete is scored by a model trained only on the other 33, and its honest accuracy is reported alongside every estimate
+- Optional, leakage-safe training-data augmentation, **off by default**: the project's own study found that noise added to extracted features hurts cross-athlete generalization (see [`research/`](research/README.md))
+- Evidence-grounded explanations: a retrieval-augmented layer that cites physiology notes and checks every number it states against the live window
 - Epistemic uncertainty quantification via Monte Carlo Dropout (50 stochastic forward passes generating 95% confidence intervals on the Borg RPE scale)
 - SHAP-based explainability — global and local feature attribution, with automatic explainer selection per model family
 - Personalization layer — Leave-One-Subject-Out evaluation and subject-specific baseline adjustment, so the model adapts to *this* athlete, not just "the average one"
@@ -60,26 +64,26 @@ Every number on the dashboard is real. There is no synthetic data, no mocked pre
 
 **Live Product**
 - Real-time signal replay engine — streams an athlete's actual recorded session progressively, exactly as if a live sensor were attached, with the architecture already designed as a drop-in seam for a real sensor later
-- **AI Coach** — a structured recommendation (Priority · Confidence · Recovery Outlook · Suggested Action) built directly from real agent output, not a canned response
+- **Coach** — a plain-language recommendation ("Keep going" / "Slow down" / "Stop and rest") built directly from real agent output, with the agents' exact wording one click away, not a canned response
 - Dark & light themes, fully re-tinted design system, persisted per user
-- Live-updating charts, HUD-style performance rings, and a skill radar — all driven by the same real payload, perfectly in sync across every tab
+- Written for athletes and coaches, not data scientists: everyday words, a few clear visuals, and the technical detail (raw signals, SHAP values, agent logs) tucked into collapsed panels
 - Accessible by default — focus states, `aria-live` regions, reduced-motion support
 
 ---
 
 ## Dashboard Showcase
 
-The dashboard is organized around one continuous story — not five disconnected screens:
+The dashboard is written for athletes and coaches with no technical background. It is organized around one continuous story — not five disconnected screens:
 
 | Tab | What it shows |
 |---|---|
-| **Live Performance** | Real EMG/IMU/PPG signals, streamed progressively from the athlete's recorded session |
-| **Performance Score** | A live, human-friendly read on how the body is handling the session right now |
-| **AI Insights** | Why the model reached this conclusion — visual, ranked, plain-language, with technical SHAP values available on demand |
-| **Athlete Profile** | A player-card view of real demographics, strength baseline, and a skill radar |
-| **AI Coach** | A live check-in with the real 4-agent backend — Priority, Confidence, Recovery Outlook, and a Suggested Action |
+| **Right Now** | What the athlete is doing and how their muscles are responding, with a simple effort trend. The raw EMG/IMU/PPG signals are one click away in a collapsed panel |
+| **How Tired?** | How hard the athlete is working on the 6–20 Borg scale, shown next to their own rating, with the method and typical error (about ±2.3) stated in plain words. For the first ~30 s of each exercise it says "Warming up" rather than showing an unvalidated guess |
+| **Why?** | The three biggest reasons behind the current reading, in everyday language; exact SHAP values are in a collapsed technical panel |
+| **About You** | The athlete's real details (age, height, strength), their earlier sessions, and how the fatigue chance changes once their own usual signals are taken into account |
+| **Coach** | A check-in with the real 4-agent backend that says what to do next, plus a box to ask a question and get an answer that cites its sources |
 
-A persistent hero strip keeps **Performance**, **Fatigue Status**, and the latest **AI Recommendation** visible no matter which tab is open, so the athlete's current state is never more than a glance away.
+A persistent hero strip keeps the **effort score**, a one-word **status**, and the coach's latest advice visible no matter which tab is open, so the athlete's current state is never more than a glance away.
 
 > **Screenshots**: this repository ships without pre-rendered screenshots (`assets/images/` is present but empty by design — nothing here is stock photography). Run the dashboard locally (see [Installation](#installation)) to see it live in under five minutes, or drop your own captures into `assets/images/` and link them here.
 
@@ -111,9 +115,9 @@ flowchart TD
 
     subgraph Frontend["Dashboard (dashboard/)"]
         L[Live Charts & Gauges]
-        M[AI Insights]
-        N[Athlete Profile]
-        O[AI Coach]
+        M[How Tired? / Why?]
+        N[About You]
+        O[Coach]
     end
 
     A --> B --> C --> D --> F
@@ -151,7 +155,7 @@ flowchart LR
 2. **Replay Engine** — streams that athlete's session forward progressively, one live-looking window at a time
 3. **Preprocessing** — the same modality-specific cleaning used throughout the ML pipeline (band-pass filtering, gap-filling, drift removal)
 4. **Feature Engineering** — sliding-window time/frequency-domain feature extraction
-5. **Prediction** — the trained Random Forest classifier scores the current window
+5. **Prediction** — the trained Random Forest classifier scores the current window for fatigue risk; once about 30 seconds of the condition have replayed, a Ridge regression (trained on the other 33 athletes) adds an out-of-sample Borg RPE estimate. Until then the estimate is a labelled probability proxy
 6. **Explainability** — the SHAP `TreeExplainer` attributes the prediction to specific features
 7. **Personalization** — the prediction is adjusted using this athlete's own strength baseline
 8. **Agents** — four agents turn all of the above into one coherent recommendation
@@ -170,7 +174,7 @@ flowchart LR
 
 `AgentOrchestrator` runs all four sequentially — Data Intelligence → Personalization → Explainability → Decision & Reporting — and short-circuits straight to a safety report if the Data Intelligence Agent rejects the incoming signal.
 
-The agents run against **live inference from the real trained model and replay engine** — every check-in from the dashboard's AI Coach tab triggers a genuine run of this pipeline over the athlete's current window; nothing is templated or replayed from a fixture.
+The agents run against **live inference from the real trained model and replay engine** — every check-in from the dashboard's Coach tab triggers a genuine run of this pipeline over the athlete's current window; nothing is templated or replayed from a fixture.
 
 ---
 
@@ -186,9 +190,14 @@ Agentic-Fatigue-Fingerprinting/
 │   │   ├── common/            Shared configuration, dataset builder, group-aware splitting, metrics
 │   │   ├── classical/         Logistic Regression, SVM, Random Forest, XGBoost
 │   │   ├── deep_learning/     1D-CNN, BiLSTM, CNN-BiLSTM, TCN
+│   │   ├── borg_regression/   Leave-one-participant-out Ridge that estimates Borg RPE (+ its packaged data)
 │   │   └── proposed/          Multimodal cross-modal attention architecture
 │   ├── explainability/        SHAP explainers, attention visualization, report generation
-│   └── personalization/       Subject profiles, LOSO evaluation, personalized prediction, similarity
+│   ├── personalization/       Subject profiles, LOSO evaluation, personalized prediction, similarity
+│   ├── rag/                   Evidence-grounded explanations: retrieval, number-checking guardrail, router
+│   └── hardware/              ESP32 packet simulator and streaming engine (sensor-contract testing only)
+├── knowledge/                 Source-tagged physiology, protocol, and safety notes used by the RAG layer
+├── research/                  The leave-one-participant-out study behind the Ridge estimator: scripts, inputs, results
 ├── backend/
 │   ├── agents/                 Data Intelligence, Personalization, Explainability, Decision/Reporting agents + orchestrator
 │   ├── services/                Replay engine (live session streaming) and cached model/SHAP service
@@ -198,7 +207,7 @@ Agentic-Fatigue-Fingerprinting/
 ├── notebooks/                  Runnable, reproducible pipeline and report scripts
 ├── reports/                    Generated Markdown reports and figures (real benchmark output)
 ├── docs/                       Design-rationale documentation per module
-├── tests/                      pytest suite (345+ passing tests)
+├── tests/                      pytest suite (376 tests)
 ├── datasets/                   Raw and processed data (not version-controlled)
 └── assets/                     Diagrams and images
 ```
@@ -250,13 +259,23 @@ Download [WSD4FEDSRM](https://zenodo.org/records/8415066) from Zenodo and extrac
 datasets/raw/WSD4FEDSRM/
 ```
 
-**5. Verify the installation**
+**5. Train the deployed fatigue classifier (one-time)**
+
+The trained Random Forest checkpoint is not stored in the repository (some checkpoints exceed GitHub's file-size limit), so create it once. This runs the full baseline benchmark and took about 45 minutes on a CPU:
+
+```bash
+python notebooks/phase9_baseline_models_report.py
+```
+
+It writes `ml/models/artifacts/classical/emg_all_binary_fatigue/random_forest.joblib`, which the live dashboard loads. The Ridge Borg estimator needs no training step: its data ships in `ml/models/borg_regression/data/` and each athlete's model is fitted in under a second when their session loads.
+
+**6. Verify the installation**
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-All 345+ tests should pass — if they do, the environment is ready.
+All 376 tests should pass (a few are skipped when optional components — `sentence-transformers` or a local Ollama LLM — aren't installed) — if they do, the environment is ready.
 
 ---
 
@@ -273,6 +292,21 @@ uvicorn backend.api.app:app --reload
 | **Dashboard** | `http://127.0.0.1:8000/dashboard/` |
 
 The backend also serves the dashboard directly — you don't need Node.js installed just to use the product.
+
+**API overview**
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/replay/subjects` | The 34 athletes available to replay |
+| `GET /api/replay/stream/{id}` | Server-Sent Events: one fully-computed window at a time (signals, prediction, SHAP, Borg estimate, personalization) |
+| `POST /api/agents/analyze` | Run the 4 agents on the current window. Needs an open replay session (or an explicit `predicted_rpe`); otherwise returns `409` |
+| `POST /api/rag/explain` | Evidence-grounded explanation of the current window; same `409` rule |
+| `GET /api/rag/sources` | The knowledge chunks the explanations can cite |
+| `GET /api/reports/metrics` | Measured evaluation metrics (from the research study) plus live retrieval metrics |
+| `GET /api/signals/live/{id}` | Hardware-simulator stream for sensor-contract testing; requires an `X-API-Key` header |
+| `GET /api/health` | Service status |
+
+For the simulator endpoint, set your own key with the `FATIGUE_API_KEY` environment variable; the built-in default is for local development only.
 
 ## Running the Dashboard (frontend dev mode)
 
@@ -302,7 +336,7 @@ There's no hosted demo — the product replays real, non-public sensor recording
 2. Open `http://127.0.0.1:8000/dashboard/`
 3. Pick any of the 34 available athletes from the sidebar
 4. Watch their real recorded session replay live across every tab
-5. Open **AI Coach** and click **Check In With Coach** for a live, real 4-agent assessment
+5. After about 30 seconds of an exercise the careful effort estimate appears; then open **Coach** and click **Check in** for a live, real 4-agent assessment
 
 First load for a given athlete takes up to about a minute — that's the real preprocessing and feature-extraction pipeline running over their actual recording, not a loading animation for its own sake.
 
@@ -336,6 +370,18 @@ Four classical and four deep learning models were benchmarked under one identica
 
 **Random Forest is the model actually deployed** in the live dashboard and agent pipeline — chosen for its exact SHAP `TreeExplainer` compatibility, which keeps every explanation shown to an athlete mathematically exact rather than approximated. Full methodology, all feature-subset comparisons, and figures are in [`reports/baseline_models_report.md`](reports/baseline_models_report.md).
 
+### Estimating Borg RPE (regression)
+
+The classifier above answers "fatigued or not". To estimate the Borg RPE itself, a separate study ([`research/`](research/README.md)) trained regression models on 3 consecutive 5-second windows (55 features each), scoring every athlete with a model that never saw them (leave-one-participant-out, 34 athletes, 888 sequences):
+
+| Model | MAE (Borg points) | Correlation | Within 1 point |
+|---|---|---|---|
+| Always guess the training median | **2.18** | — | 34.3% |
+| **Ridge regression (deployed)** | 2.31 | 0.16 | 22.7% |
+| LSTM + attention | 2.48 | 0.09 | 25.9% |
+
+Ridge beats the LSTM and is far steadier from athlete to athlete, which is why it is the deployed estimator. It does **not** beat simply guessing the average on error, so the dashboard labels every estimate with its method and typical error (about ±2.3 Borg points) and treats it as a research indication, not a measurement. For the first ~30 seconds of a condition, before one full 3-window sequence exists, the estimate falls back to a labelled probability proxy. The study also found that noise added to *extracted features* made models worse, which is why training-data augmentation is off by default (details in [`research/results/final_synthesis_report.md`](research/results/final_synthesis_report.md)).
+
 ---
 
 ## Explainability
@@ -347,7 +393,7 @@ Four classical and four deep learning models were benchmarked under one identica
 | Global Explanations | Which features matter most across this athlete's entire session |
 | Local Explanations | Signed, per-feature contributions for one specific prediction, live |
 
-In the dashboard, this becomes the **AI Insights** tab: plain-language "what influenced this" first, exact SHAP numbers one click away in a collapsed technical-details panel — never hidden, never the first thing you see.
+In the dashboard, this becomes the **Why?** tab: plain-language "what influenced this" first, exact SHAP numbers one click away in a collapsed technical-details panel — never hidden, never the first thing you see.
 
 ---
 
@@ -360,7 +406,7 @@ In the dashboard, this becomes the **AI Insights** tab: plain-language "what inf
 | Personalized Prediction | The population-level prediction blended with this athlete's own baseline deviation |
 | Similarity Analysis | Configurable cosine/Euclidean similarity search to find the most physiologically similar participants |
 
-In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Population Average" comparison and a skill radar (Strength, Resilience, Focus, Endurance) — every axis a documented, real transform of a genuine underlying value.
+In the dashboard's **About You** tab, this becomes the athlete's real details plus an "Average athlete → This athlete" comparison of the fatigue chance.
 
 ---
 
@@ -387,7 +433,7 @@ In the dashboard's **Athlete Profile** tab, this becomes a "Your Score vs. Popul
 | Backend API | FastAPI, Uvicorn, Pydantic |
 | Real-time Streaming | Server-Sent Events (SSE) |
 | Frontend | Vite, Chart.js, Lucide Icons |
-| Testing | pytest (345+ passing tests) |
+| Testing | pytest (376 tests) |
 | Version Control | Git, GitHub |
 
 ---
@@ -403,6 +449,7 @@ Design-rationale documentation for individual modules lives in [`docs/`](docs/):
 - [`proposed_model.md`](docs/proposed_model.md)
 - [`explainability.md`](docs/explainability.md)
 - [`hardware_contract.md`](docs/hardware_contract.md)
+- [`research/README.md`](research/README.md) — the leave-one-participant-out Borg-RPE study, its scripts, and its results
 
 ## Contributing
 
