@@ -13,7 +13,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -34,14 +34,18 @@ class LLMEvalReport:
     retrieval_recall_top1: float
     retrieval_recall_top3: float
     mean_latency_ms: float
-    selective_call_savings_pct: float
+    selective_call_savings_pct: Optional[float]  # None: not measurable by this battery
 
 
 class LLMLayerEvaluator:
     """Automated benchmark runner for the LLM/RAG explanation layer."""
 
-    def __init__(self):
-        self.kb = LocalRAGKnowledgeBase()
+    # Number of fixed physiological test queries used by `evaluate_retrieval_quality`.
+    RETRIEVAL_TEST_QUERY_COUNT = 7
+
+    def __init__(self, knowledge_base: Optional[LocalRAGKnowledgeBase] = None):
+        """Pass an already-loaded knowledge base to avoid reloading its embeddings."""
+        self.kb = knowledge_base or LocalRAGKnowledgeBase()
         self.router = HybridRouter(knowledge_base=self.kb)
         self.checker = NumberChecker()
 
@@ -117,16 +121,16 @@ class LLMLayerEvaluator:
             self.router.explain(summary, force_trigger=True)
         mean_lat = ((time.perf_counter() - t0) / 20.0) * 1000.0
 
-        # Selective call savings (e.g. ~75% of windows operate in normal safe bounds)
-        savings = 72.5
-
+        # Savings from selective triggering depend on real session data (how many
+        # windows stay inside safe bounds); this synthetic battery cannot measure
+        # it, so it is reported as unmeasured rather than as an invented figure.
         return LLMEvalReport(
             faithfulness_rate=faithfulness,
             total_samples_evaluated=total,
             retrieval_recall_top1=rec1,
             retrieval_recall_top3=rec3,
             mean_latency_ms=mean_lat,
-            selective_call_savings_pct=savings,
+            selective_call_savings_pct=None,
         )
 
 
@@ -138,4 +142,5 @@ if __name__ == "__main__":
     print(f"Retrieval Recall (Top-1): {report.retrieval_recall_top1:.1f}%")
     print(f"Retrieval Recall (Top-3): {report.retrieval_recall_top3:.1f}%")
     print(f"Mean Latency: {report.mean_latency_ms:.2f} ms")
-    print(f"Selective Trigger Compute Savings: {report.selective_call_savings_pct:.1f}%")
+    savings = report.selective_call_savings_pct
+    print(f"Selective Trigger Compute Savings: {'not measured' if savings is None else f'{savings:.1f}%'}")

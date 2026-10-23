@@ -1,0 +1,70 @@
+{
+  "source": "research/results (34-fold leave-one-participant-out study)",
+  "protocol": "Leave-one-participant-out; every held-out athlete scored by a model that never saw them",
+  "target": "Borg RPE (6-20 scale), regression",
+  "n_participants": 34,
+  "n_sequences": 888,
+  "loso_metrics": {
+    "median_baseline": {
+      "mae": 2.1791,
+      "correlation": null,
+      "within_1_borg_pct": 34.3468,
+      "mean_participant_mae": 2.0851
+    },
+    "ridge_nested": {
+      "mae": 2.3139,
+      "correlation": 0.1594,
+      "within_1_borg_pct": 22.7477,
+      "mean_participant_mae": 2.2622
+    },
+    "lstm_attention": {
+      "mae": 2.4777,
+      "correlation": 0.0868,
+      "within_1_borg_pct": 25.9009,
+      "mean_participant_mae": 2.5084
+    }
+  },
+  "model_family_comparison": [
+    {
+      "model": "median_baseline",
+      "mae": 2.1791,
+      "rmse": 2.778,
+      "correlation": null,
+      "within_1_borg_pct": 34.35,
+      "fold_mae_std": 0.496
+    },
+    {
+      "model": "ridge",
+      "mae": 2.2203,
+      "rmse": 2.6671,
+      "correlation": 0.1568,
+      "within_1_borg_pct": 22.07,
+      "fold_mae_std": 0.395
+    },
+    {
+      "model": "random_forest",
+      "mae": 2.266,
+      "rmse": 2.7163,
+      "correlation": 0.1017,
+      "within_1_borg_pct": 21.62,
+      "fold_mae_std": 0.4095
+    },
+    {
+      "model": "gradient_boosting",
+      "mae": 2.3318,
+      "rmse": 2.8392,
+      "correlation": 0.1355,
+      "within_1_borg_pct": 22.41,
+      "fold_mae_std": 0.466
+    },
+    {
+      "model": "lstm_attention",
+      "mae": 2.689,
+      "rmse": 3.5338,
+      "correlation": 0.0537,
+      "within_1_borg_pct": 23.2,
+      "fold_mae_std": 1.4221
+    }
+  ],
+  "interpretation": "Errors are in Borg points (lower is better). The Ridge estimate (MAE about 2.3, correlation about 0.16) is not meaningfully better than always predicting the training median (MAE about 2.2), so treat individual estimates as a research indication, not a measurement."
+}

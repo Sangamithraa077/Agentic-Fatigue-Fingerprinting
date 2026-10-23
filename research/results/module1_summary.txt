@@ -1,0 +1,25 @@
+### Dataset Audit — Duration Consistency
+
+The WSD4FEDSRM dataset contains 34 participants across six shoulder-rotation exercise conditions, giving 204 participant-task records. All expected EMG, IMU and PPG files were present in the audited conditions. The CSV quality check covered 8,364 files and found no empty files, missing values or unreadable files.
+
+Sensor durations were estimated using EMG sample counts at 1,000 Hz, IMU sample counts at 100 Hz, and PPG sample counts at 200 Hz. The three sensor streams had a maximum duration spread of approximately 0.01 seconds within the audited tasks.
+
+Comparison with recorded Borg task durations identified three tasks with absolute differences greater than five seconds. One task, subject_27's task3_55i, showed a substantial discrepancy: the recorded Borg duration was 122 seconds, whereas the sensor streams lasted approximately 80.91 seconds. The cause remains unverified.
+
+Original recordings will be preserved without artificial padding, stretching, or deletion. Duration discrepancies and incomplete Borg ratings will be documented and considered during preprocessing and temporal alignment.
+### Participant-Wise Evaluation of Gaussian-Noise Augmentation
+
+A Leave-One-Participant-Out (LOPO) evaluation was conducted to compare the baseline LSTM with Attention against an augmented model using Gaussian-noise perturbations. Across 34 held-out participants, the baseline achieved an MAE of 2.478, a correlation of 0.0868, and a within-one-Borg-unit rate of 25.90%. The augmented model achieved an MAE of 2.849, a correlation of 0.0701, and a within-one-Borg-unit rate of 21.17%.
+
+Participant-level analysis showed improved MAE for 6 participants and increased MAE for 28 participants. The mean participant-level MAE change was +0.373 Borg units, indicating overall deterioration. Therefore, the evaluated Gaussian-noise augmentation strategy was not retained as a performance improvement. These findings also indicate that the baseline model's predictive association with the target requires further investigation.
+## Results and Discussion: Effect of Data Augmentation
+
+The baseline LSTM with Attention model was evaluated using a leave-one-participant-out (LOPO) strategy across 34 participants. Two data augmentation approaches, consistent Gaussian augmentation and V2 constrained-noise augmentation, were investigated to determine whether increasing the number of training sequences improved fatigue-rating prediction for unseen participants.
+
+The baseline model achieved a pooled mean absolute error (MAE) of 2.4777 Borg points, a correlation of 0.0868, and an accuracy proportion of 25.90% within one Borg point of the reference rating. Consistent Gaussian augmentation increased the pooled MAE to 2.7570, while V2 constrained-noise augmentation increased it to 2.8492. The mean participant-level MAE also increased from 2.5084 for the baseline to 2.8119 and 2.8809, respectively.
+
+Although augmentation approximately doubled the training sequences available in each fold, it did not improve generalization to held-out participants. Gaussian augmentation produced a slightly higher correlation than the baseline, but its MAE and within-one-point proportion were worse. V2 augmentation resulted in lower correlation and a smaller proportion of predictions within one Borg point. At the participant level, V2 augmentation improved MAE for only 6 of 34 participants and worsened it for the remaining 28.
+
+These findings suggest that increasing the number of training sequences through small perturbations of existing sensor sequences does not necessarily introduce useful independent information. Because augmented samples inherit labels from their source sequences, the added examples may not adequately represent the variability in fatigue responses across individuals. Consequently, the baseline LSTM with Attention was retained as the primary model, while both augmentation methods were documented as evaluated alternatives that did not improve overall predictive performance.
+
+The findings should be interpreted cautiously. The low correlation values indicate limited agreement in the variation of predicted and reference Borg ratings. Furthermore, augmentation does not increase the number of independent participants, and the current experiments do not establish reliable fatigue prediction in real-world settings. Further evaluation with additional participants, stronger validation of physiological plausibility, and comparisons against simpler baselines is required.

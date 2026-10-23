@@ -1,0 +1,52 @@
+stage,experiment,model,multiplier,pooled_mae,rmse,correlation,within_1_borg_pct,mean_fold_mae,std_fold_mae,notes
+Stage 0 (Reference),Training Median Baseline,Median Predictor,0x,2.179,2.778,0.0,34.3,2.0851,0.496,Historical benchmark / theoretical baseline floor
+Stage 0 (Reference),Historical LSTM + Attention,LSTM + Attention,0x,2.4777,,0.0868,25.9,2.5084,,Historical benchmark report result
+Stage 0 (Reference),Historical Naive Gaussian Noise,LSTM + Attention,1x,2.757,,,,,,Feature-space Gaussian noise (worsened performance)
+Stage 0 (Reference),Historical Constrained V2 Noise,LSTM + Attention,1x,2.8492,,,,,,Constrained feature-space noise (worsened performance)
+Stage 1,Overlapping Windows (2.5s stride),Baseline LSTM (10s stride),4.4x seqs,2.689,3.5338,0.0537,23.2,2.7397,1.4435,Temporal window densification on raw signals
+Stage 1,Overlapping Windows (2.5s stride),Overlapping LSTM (2.5s windows to 10s seqs),4.4x seqs,3.0796,4.077,0.1232,22.18,3.2085,1.6277,Temporal window densification on raw signals
+Stage 2,Raw Signal Aug: amplitude_scaling_weak,LSTM + Attention,1x,2.9581,3.8424,0.0637,20.95,3.0203,1.4196,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: amplitude_scaling_medium,LSTM + Attention,1x,2.9154,3.7581,0.0647,20.72,2.9658,1.3463,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: time_warping_weak,LSTM + Attention,1x,2.9732,3.8533,0.0838,21.73,3.0082,1.3405,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: time_warping_medium,LSTM + Attention,1x,2.9506,3.8043,0.0909,22.18,2.9906,1.2662,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: jitter_weak,LSTM + Attention,1x,2.9641,3.8425,0.0721,21.06,3.0121,1.3955,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: jitter_medium,LSTM + Attention,1x,2.8965,3.6809,0.0892,20.38,2.9392,1.1399,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: magnitude_warping_weak,LSTM + Attention,1x,2.7601,3.6337,0.1308,24.66,2.8105,1.2886,Physics-preserving raw transformation
+Stage 2,Raw Signal Aug: magnitude_warping_medium,LSTM + Attention,1x,2.8457,3.7029,0.0798,24.1,2.8296,1.3275,Physics-preserving raw transformation
+Stage 3,Model Family: median_baseline,median_baseline,0x,2.1791,2.778,,34.35,2.0851,0.496,Unaugmented comparison on identical LOPO folds
+Stage 3,Model Family: ridge,ridge,0x,2.2203,2.6671,0.1568,22.07,2.1507,0.395,Unaugmented comparison on identical LOPO folds
+Stage 3,Model Family: random_forest,random_forest,0x,2.266,2.7163,0.1017,21.62,2.2016,0.4095,Unaugmented comparison on identical LOPO folds
+Stage 3,Model Family: gradient_boosting,gradient_boosting,0x,2.3318,2.8392,0.1355,22.41,2.3051,0.466,Unaugmented comparison on identical LOPO folds
+Stage 3,Model Family: lstm_attention,lstm_attention,0x,2.689,3.5338,0.0537,23.2,2.7397,1.4221,Unaugmented comparison on identical LOPO folds
+Stage 4,Tuning: mag_warp_weak (1x),LSTM,1x,2.7562,3.6445,0.1258,25.11,2.8211,1.3161,Tuned transform: mag_warp_weak
+Stage 4,Tuning: mag_warp_weak (1x),Ridge,1x,2.228,2.6767,0.1761,21.85,2.1665,0.4144,Tuned transform: mag_warp_weak
+Stage 4,Tuning: mag_warp_weak (2x),LSTM,2x,3.0949,3.9932,0.0838,22.41,3.1193,1.2879,Tuned transform: mag_warp_weak
+Stage 4,Tuning: mag_warp_weak (2x),Ridge,2x,2.2418,2.6968,0.177,22.18,2.1841,0.4291,Tuned transform: mag_warp_weak
+Stage 4,Tuning: mag_warp_medium (1x),LSTM,1x,2.7409,3.5887,0.0871,23.42,2.7336,1.2769,Tuned transform: mag_warp_medium
+Stage 4,Tuning: mag_warp_medium (1x),Ridge,1x,2.3645,2.8714,0.174,21.51,2.3214,0.509,Tuned transform: mag_warp_medium
+Stage 4,Tuning: mag_warp_medium (2x),LSTM,2x,2.6072,3.3024,0.1476,25.23,2.6363,0.886,Tuned transform: mag_warp_medium
+Stage 4,Tuning: mag_warp_medium (2x),Ridge,2x,2.3447,2.8595,0.192,22.64,2.3182,0.4995,Tuned transform: mag_warp_medium
+Stage 4,Tuning: mag_warp_strong (1x),LSTM,1x,2.6714,3.4512,0.0955,23.09,2.6685,1.2198,Tuned transform: mag_warp_strong
+Stage 4,Tuning: mag_warp_strong (1x),Ridge,1x,2.3259,2.8276,0.1768,22.18,2.2759,0.5054,Tuned transform: mag_warp_strong
+Stage 4,Tuning: mag_warp_strong (2x),LSTM,2x,2.5702,3.3347,0.1315,25.56,2.6108,1.1182,Tuned transform: mag_warp_strong
+Stage 4,Tuning: mag_warp_strong (2x),Ridge,2x,2.3218,2.8248,0.1887,22.75,2.2767,0.5019,Tuned transform: mag_warp_strong
+Stage 4,Tuning: jitter_weak (1x),LSTM,1x,2.9116,3.6961,0.0897,20.5,2.945,1.1267,Tuned transform: jitter_weak
+Stage 4,Tuning: jitter_weak (1x),Ridge,1x,2.4356,2.9794,0.1568,21.73,2.408,0.5798,Tuned transform: jitter_weak
+Stage 4,Tuning: jitter_weak (2x),LSTM,2x,3.129,4.0747,0.095,21.62,3.1588,1.5451,Tuned transform: jitter_weak
+Stage 4,Tuning: jitter_weak (2x),Ridge,2x,2.4434,2.9925,0.158,21.51,2.4184,0.5806,Tuned transform: jitter_weak
+Stage 4,Tuning: jitter_medium (1x),LSTM,1x,2.9484,3.8346,0.0693,21.17,3.0242,1.4199,Tuned transform: jitter_medium
+Stage 4,Tuning: jitter_medium (1x),Ridge,1x,2.4363,2.9784,0.1567,21.62,2.4094,0.5793,Tuned transform: jitter_medium
+Stage 4,Tuning: jitter_medium (2x),LSTM,2x,3.0986,4.0515,0.1018,22.97,3.1402,1.5425,Tuned transform: jitter_medium
+Stage 4,Tuning: jitter_medium (2x),Ridge,2x,2.4429,2.9922,0.1575,21.51,2.4186,0.5804,Tuned transform: jitter_medium
+Stage 4,Tuning: jitter_strong (1x),LSTM,1x,2.9683,3.855,0.0722,20.61,3.0319,1.4248,Tuned transform: jitter_strong
+Stage 4,Tuning: jitter_strong (1x),Ridge,1x,2.4377,2.9808,0.1566,21.4,2.41,0.581,Tuned transform: jitter_strong
+Stage 4,Tuning: jitter_strong (2x),LSTM,2x,3.0977,4.0605,0.1033,22.3,3.1689,1.5318,Tuned transform: jitter_strong
+Stage 4,Tuning: jitter_strong (2x),Ridge,2x,2.4439,2.9931,0.158,20.83,2.419,0.5816,Tuned transform: jitter_strong
+Stage 5,Label Strategy: nearest_labels,LSTM,4.4x,2.6164,3.5146,0.0936,25.45,2.7049,1.4472,nearest_labels on intermediate windows
+Stage 5,Label Strategy: nearest_labels,Ridge,4.4x,2.3749,2.8986,0.1827,22.18,2.3342,0.5167,nearest_labels on intermediate windows
+Stage 5,Label Strategy: linear_interpolated_labels,LSTM,4.4x,2.7384,3.6736,0.0758,24.1,2.8336,1.5866,linear_interpolated_labels on intermediate windows
+Stage 5,Label Strategy: linear_interpolated_labels,Ridge,4.4x,2.3572,2.8787,0.1784,22.64,2.3149,0.506,linear_interpolated_labels on intermediate windows
+Stage 6,Mixup: mixup_delta1,LSTM,1x,2.8783,3.7419,0.0636,21.85,2.921,1.4235,Physics-preserving raw mixup within participant
+Stage 6,Mixup: mixup_delta1,Ridge,1x,2.3998,2.9265,0.1571,22.3,2.3553,0.5674,Physics-preserving raw mixup within participant
+Stage 6,Mixup: mixup_delta2,LSTM,1x,2.7289,3.5627,0.064,24.77,2.7495,1.2837,Physics-preserving raw mixup within participant
+Stage 6,Mixup: mixup_delta2,Ridge,1x,2.5006,3.0425,0.1207,21.51,2.4717,0.6394,Physics-preserving raw mixup within participant
