@@ -1,19 +1,18 @@
-// Athlete Intelligence -- Dashboard data & presentation layer.
+// Athlete Intelligence -- dashboard.
 //
-// Every chart and metric on this page is driven exclusively by real data
-// from the FastAPI backend's `/api/replay/*` endpoints, which replay a
-// selected WSD4FEDSRM subject's actual recordings through this project's
-// real preprocessing, feature engineering, model, SHAP, and personalization
-// pipelines (see backend/services/replay_engine.py). Nothing here generates
-// or approximates a signal -- there is no Math.random()/Math.sin() anywhere
-// in this file. This file only changes HOW real values are labeled,
-// formatted, and animated -- every fetch call, endpoint, and payload field
-// below is unchanged from the underlying data-integration layer. The
-// light/dark theme toggle is a pure display preference and never affects
-// what data is fetched or how it's computed.
+// Every figure shown here comes from the FastAPI backend's real endpoints
+// (`/api/replay/*`, `/api/agents/analyze`, `/api/rag/explain`), which replay a
+// chosen athlete's actual WSD4FEDSRM recording through this project's real
+// preprocessing, models, SHAP explainer and agents. Nothing in this file
+// generates or approximates data; if the backend is unavailable the page says
+// so instead of showing anything made up.
+//
+// This file's job is translation: turning model output into plain words an
+// athlete or coach can read ("Hard, 16 out of 20", "Higher than usual").
 
 const API_BASE = 'http://127.0.0.1:8000';
-const RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52), matches the SVG rings in index.html
+const RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52), matches the SVG ring in index.html
+const MAX_HISTORY_POINTS = 120;
 
 // ---------------------------------------------------------------------------
 // State
@@ -21,12 +20,10 @@ const RING_CIRCUMFERENCE = 326.7; // 2 * PI * r(52), matches the SVG rings in in
 
 let isPlaying = true;
 let currentEventSource = null;
-let currentSubjectId = null;
 let lastPayload = null;
-let lastDecisionNarrative = null;
-let lastPriorityLabel = null;
-const fatigueHistory = []; // rolling {step, score, rpe}
-const MAX_HISTORY_POINTS = 60;
+let lastAdvice = null; // { status, text } from the latest coach check-in
+const effortHistory = []; // {t, rms} -- muscle effort per window
+const ratingHistory = []; // {t, estimate, reported}
 
 const charts = {};
 const counterAnimations = new WeakMap();
@@ -39,34 +36,118 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-// ---------------------------------------------------------------------------
-// Plain-language translation of the real, technical EMG feature names.
-// These are exactly the 12 features the trained model + SHAP explainer use
-// (ml/feature_engineering/emg_features.py); nothing here is invented, this
-// only supplies a friendlier label + one-line description for each.
-// ---------------------------------------------------------------------------
-
-const FEATURE_TRANSLATIONS = {
-  mav: { label: 'Average Muscle Effort', desc: 'How hard the muscle worked on average during this moment.' },
-  rms: { label: 'Muscle Activity Level', desc: "The muscle's overall signal strength right now." },
-  variance: { label: 'Effort Variability', desc: 'How much the muscle effort fluctuated moment to moment.' },
-  waveform_length: { label: 'Movement Complexity', desc: 'How complex or erratic the muscle signal shape is.' },
-  zero_crossings: { label: 'Signal Fluctuation Rate', desc: 'How rapidly the muscle signal changes direction.' },
-  slope_sign_changes: { label: 'Muscle Firing Pattern', desc: 'A marker of how the muscle fibers are firing.' },
-  willison_amplitude: { label: 'Muscle Contraction Bursts', desc: 'How many strong contraction bursts occurred.' },
-  integrated_emg: { label: 'Total Muscle Engagement', desc: 'The cumulative muscle engagement over this moment.' },
-  mean_frequency: { label: 'Muscle Fatigue Signal', desc: 'A frequency-based marker that shifts as muscles fatigue.' },
-  median_frequency: { label: 'Muscle Fiber Fatigue Index', desc: 'Another frequency marker sensitive to fatigue.' },
-  peak_frequency: { label: 'Dominant Muscle Frequency', desc: 'The strongest frequency in the muscle signal.' },
-  spectral_entropy: { label: 'Signal Complexity', desc: 'How spread out vs. concentrated the signal energy is.' },
-};
-
-function translateFeature(featureKey) {
-  return FEATURE_TRANSLATIONS[featureKey] || { label: featureKey, desc: 'A real signal feature used by the AI model.' };
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
 
 // ---------------------------------------------------------------------------
-// Small presentation helpers: animated counters + progress rings
+// Plain-language translation
+// ---------------------------------------------------------------------------
+
+// The standard Borg 6-20 scale verbal anchors, which athletes and coaches know.
+const BORG_ANCHORS = [
+  [6, 'No effort'], [7, 'Extremely light'], [9, 'Very light'], [11, 'Light'],
+  [13, 'Somewhat hard'], [15, 'Hard'], [17, 'Very hard'], [19, 'Extremely hard'], [20, 'Maximal'],
+];
+
+// A reading counts as a Borg word once it has reached that anchor (14.6 is still
+// "Somewhat hard"; 15 is "Hard"). This keeps the words in step with the status
+// thresholds below and with the coach's warning level of 15.
+function effortWord(value) {
+  return BORG_ANCHORS.reduce((best, anchor) => (anchor[0] <= value ? anchor : best), BORG_ANCHORS[0])[1];
+}
+
+// Status thresholds line up with the coach's own safety levels (15 = heavy
+// fatigue warning, 18 = critical) in backend/agents/decision_agent.py.
+function effortStatus(value) {
+  if (value >= 18) return { word: 'Exhausted', tone: 'tone-alert' };
+  if (value >= 15) return { word: 'Tiring', tone: 'tone-moderate' };
+  if (value >= 11) return { word: 'Working', tone: 'tone-good' };
+  return { word: 'Fresh', tone: 'tone-good' };
+}
+
+function effortLabel(value) {
+  return `${effortWord(value)} (${value.toFixed(0)} out of 20)`;
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// z = how many of this athlete's own standard deviations a signal sits from
+// their own average (from the backend's per-athlete baseline).
+function usualWord(z) {
+  if (z === undefined || z === null) return 'Not available';
+  if (z >= 1) return 'Much higher than usual';
+  if (z >= 0.4) return 'Higher than usual';
+  if (z <= -1) return 'Much lower than usual';
+  if (z <= -0.4) return 'Lower than usual';
+  return 'About usual';
+}
+
+// Median frequency of the muscle signal drifts down as a muscle tires.
+function tirednessSignWord(z) {
+  if (z === undefined || z === null) return 'Not available';
+  if (z <= -1) return 'Strong sign';
+  if (z <= -0.4) return 'Slight sign';
+  return 'No clear sign';
+}
+
+// Plain names and one-line meanings for the 12 real signal features the model uses.
+const FEATURE_TRANSLATIONS = {
+  mav: { label: 'Average muscle effort', desc: 'How hard the muscle worked on average.' },
+  rms: { label: 'Muscle activity level', desc: "The muscle's overall signal strength." },
+  variance: { label: 'Effort variability', desc: 'How much the effort fluctuated.' },
+  waveform_length: { label: 'Movement complexity', desc: 'How busy or erratic the muscle signal is.' },
+  zero_crossings: { label: 'Signal fluctuation rate', desc: 'How quickly the muscle signal changes direction.' },
+  slope_sign_changes: { label: 'Muscle firing pattern', desc: 'How the muscle fibres are firing.' },
+  willison_amplitude: { label: 'Muscle contraction bursts', desc: 'How many strong contractions happened.' },
+  integrated_emg: { label: 'Total muscle engagement', desc: 'The total muscle activity in this moment.' },
+  mean_frequency: { label: 'Muscle tiredness signal', desc: 'A signal that slows down as muscles tire.' },
+  median_frequency: { label: 'Muscle fibre tiredness', desc: 'Another signal that slows down as muscles tire.' },
+  peak_frequency: { label: 'Dominant muscle rhythm', desc: 'The strongest rhythm in the muscle signal.' },
+  spectral_entropy: { label: 'Signal complexity', desc: 'How spread out the muscle signal is.' },
+};
+
+function translateFeature(key) {
+  return FEATURE_TRANSLATIONS[key] || { label: key, desc: 'A signal feature used by the model.' };
+}
+
+// The effort figure the dashboard (and the coach) use for this moment: the
+// out-of-sample Ridge estimate once ~30 s of the exercise have replayed,
+// otherwise the classifier-probability proxy -- `source` always says which.
+function currentRpeEstimate(payload) {
+  const pred = payload.prediction;
+  return pred.estimated_rpe || { value: pred.estimated_rpe_proxy, source: 'rf_probability_proxy' };
+}
+
+// The careful (Ridge) estimate needs ~30 s of an exercise. Until then the only
+// figure is the fatigue detector's rough guess, which has not been validated as an
+// effort estimate, so it is never used as the headline.
+function estimateReady(payload) {
+  const source = currentRpeEstimate(payload).source;
+  const reason = (payload.prediction.borg_regression || {}).reason;
+  return source === 'ridge_lopo' || reason === 'no_study_data';
+}
+
+function warmupSeconds(payload) {
+  const from = (payload.prediction.borg_regression || {}).available_from_s;
+  return from != null ? Math.round(from) : 30;
+}
+
+function describeEstimateMethod(payload) {
+  const pred = payload.prediction;
+  const borg = pred.borg_regression || {};
+  if (currentRpeEstimate(payload).source === 'ridge_lopo') {
+    return `Estimated by comparing this athlete's signals with ${borg.trained_on_athletes} other athletes. It is typically off by about ${borg.typical_error_borg} points, so treat it as a guide, not a measurement.`;
+  }
+  if (estimateReady(payload)) return 'A quick estimate from the fatigue detector (no comparison data is available for this athlete).';
+  return `Warming up: the careful estimate starts after ${warmupSeconds(payload)} seconds of this exercise. Until then the fatigue detector's rough guess is ${effortLabel(currentRpeEstimate(payload).value).toLowerCase()}, which is not reliable on its own.`;
+}
+
+// ---------------------------------------------------------------------------
+// Small presentation helpers
 // ---------------------------------------------------------------------------
 
 function animateCounter(el, toValue, { decimals = 0, suffix = '' } = {}) {
@@ -74,11 +155,8 @@ function animateCounter(el, toValue, { decimals = 0, suffix = '' } = {}) {
   const fromValue = parseFloat(el.dataset.rawValue || '0') || 0;
   el.dataset.rawValue = String(toValue);
 
-  // Set the real final value synchronously first -- requestAnimationFrame is
-  // throttled or fully paused by the browser while this tab/pane isn't being
-  // composited (e.g. backgrounded), so the animation below must be a bonus
-  // effect layered on top of a value that is already correct, never the only
-  // path to displaying it.
+  // Set the real value synchronously first: requestAnimationFrame is paused for
+  // backgrounded tabs, so the animation is a bonus, never the only path to the number.
   el.textContent = `${toValue.toFixed(decimals)}${suffix}`;
 
   const existing = counterAnimations.get(el);
@@ -86,32 +164,19 @@ function animateCounter(el, toValue, { decimals = 0, suffix = '' } = {}) {
 
   const duration = 500;
   const start = performance.now();
-
   function tick(now) {
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
-    const current = fromValue + (toValue - fromValue) * eased;
-    el.textContent = `${current.toFixed(decimals)}${suffix}`;
-    if (t < 1) {
-      counterAnimations.set(el, requestAnimationFrame(tick));
-    } else {
-      counterAnimations.delete(el);
-    }
+    el.textContent = `${(fromValue + (toValue - fromValue) * eased).toFixed(decimals)}${suffix}`;
+    if (t < 1) counterAnimations.set(el, requestAnimationFrame(tick));
+    else counterAnimations.delete(el);
   }
   counterAnimations.set(el, requestAnimationFrame(tick));
 }
 
 function setRingProgress(el, percent) {
   if (!el) return;
-  const clamped = clamp(percent, 0, 100);
-  const offset = RING_CIRCUMFERENCE * (1 - clamped / 100);
-  el.style.strokeDashoffset = String(offset);
-}
-
-function scoreTone(score) {
-  if (score >= 70) return { tone: 'tone-good', label: 'Low Fatigue' };
-  if (score >= 40) return { tone: 'tone-moderate', label: 'Moderate Fatigue' };
-  return { tone: 'tone-alert', label: 'High Fatigue' };
+  el.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - clamp(percent, 0, 100) / 100));
 }
 
 // ---------------------------------------------------------------------------
@@ -120,11 +185,10 @@ function scoreTone(score) {
 
 function setConnectionStatus(state, text) {
   const el = document.getElementById('connectionStatus');
-  const textEl = document.getElementById('connectionStatusText');
   el.classList.remove('status-error', 'status-loading');
   if (state === 'error') el.classList.add('status-error');
   if (state === 'loading') el.classList.add('status-loading');
-  textEl.textContent = text;
+  setText('connectionStatusText', text);
 }
 
 function showError(message) {
@@ -140,11 +204,9 @@ function clearError() {
 }
 
 // ---------------------------------------------------------------------------
-// Chart initialization (empty datasets -- populated only from real payloads)
+// Charts (empty until real data arrives)
 // ---------------------------------------------------------------------------
 
-// Reads the current theme (light/dark) and returns the color set Chart.js
-// should render with -- purely a rendering palette, never a data value.
 function getChartPalette() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   return isLight
@@ -153,90 +215,49 @@ function getChartPalette() {
         tooltipBg: 'rgba(255,255,255,0.97)', tooltipBorder: 'rgba(8,145,178,0.3)', tooltipTitle: '#101a2e', tooltipBody: '#4a5672',
         cyan: '#0891b2', blue: '#2563eb', purple: '#7c3aed', amber: '#b45309', crimson: '#dc2626',
         cyanFillStrong: 'rgba(8,145,178,0.22)', cyanFillWeak: 'rgba(8,145,178,0.0)',
-        cyanTint: 'rgba(8,145,178,0.6)', cyanTintStrong: 'rgba(8,145,178,0.75)', cyanRadarFill: 'rgba(8,145,178,0.12)',
-        neutralBar: 'rgba(15,23,42,0.18)', pointBorder: '#ffffff',
       }
     : {
-        text: '#8fa3c4', muted: '#5b6c8f', grid: 'rgba(120,190,255,0.05)',
+        text: '#8fa3c4', muted: '#6b7c9e', grid: 'rgba(120,190,255,0.06)',
         tooltipBg: 'rgba(8,13,26,0.92)', tooltipBorder: 'rgba(46,230,255,0.35)', tooltipTitle: '#eaf4ff', tooltipBody: '#8fa3c4',
         cyan: '#2ee6ff', blue: '#4f8dff', purple: '#a855f7', amber: '#ffb545', crimson: '#ff3d5e',
         cyanFillStrong: 'rgba(46,230,255,0.3)', cyanFillWeak: 'rgba(46,230,255,0.0)',
-        cyanTint: 'rgba(46,230,255,0.65)', cyanTintStrong: 'rgba(46,230,255,0.8)', cyanRadarFill: 'rgba(46,230,255,0.14)',
-        neutralBar: 'rgba(120,145,190,0.4)', pointBorder: '#04070d',
       };
 }
 
 function initCharts() {
   const p = getChartPalette();
-  const commonOptions = {
+  const font = { family: 'Inter', size: 12 };
+  const common = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 400, easing: 'easeOutCubic' },
+    animation: { duration: 300 },
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { labels: { color: p.text, font: { family: 'Space Grotesk', size: 11 }, usePointStyle: true, boxWidth: 8 } },
-      tooltip: {
-        backgroundColor: p.tooltipBg,
-        borderColor: p.tooltipBorder,
-        borderWidth: 1,
-        titleColor: p.tooltipTitle,
-        titleFont: { family: 'Space Grotesk', weight: '700' },
-        bodyColor: p.tooltipBody,
-        bodyFont: { family: 'Space Grotesk' },
-        padding: 10,
-        cornerRadius: 10,
-        displayColors: true,
-      },
+      legend: { labels: { color: p.text, font, usePointStyle: true, boxWidth: 8 } },
+      tooltip: { backgroundColor: p.tooltipBg, borderColor: p.tooltipBorder, borderWidth: 1, titleColor: p.tooltipTitle, bodyColor: p.tooltipBody, padding: 10, cornerRadius: 10 },
     },
     scales: {
-      x: { grid: { color: p.grid }, ticks: { color: p.muted, font: { family: 'Space Grotesk', size: 10 } } },
-      y: { grid: { color: p.grid }, ticks: { color: p.muted, font: { family: 'Space Grotesk', size: 10 } } },
+      x: { grid: { color: p.grid }, ticks: { color: p.muted, font, maxTicksLimit: 8 } },
+      y: { grid: { color: p.grid }, ticks: { color: p.muted, font } },
     },
   };
-
-  function gradientFill(ctx, colorStart, colorEnd) {
-    const g = ctx.createLinearGradient(0, 0, 0, 250);
-    g.addColorStop(0, colorStart);
-    g.addColorStop(1, colorEnd);
+  const fill = (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 230);
+    g.addColorStop(0, p.cyanFillStrong);
+    g.addColorStop(1, p.cyanFillWeak);
     return g;
-  }
+  };
+  const withYTitle = (text) => ({ ...common, scales: { ...common.scales, y: { ...common.scales.y, title: { display: true, text, color: p.muted, font } } } });
 
-  charts.emg = new Chart(document.getElementById('emgChart').getContext('2d'), {
+  // Plain-language charts
+  charts.effortTrend = new Chart(document.getElementById('effortTrendChart').getContext('2d'), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'Ant. Deltoid', data: [], borderColor: p.cyan, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-        { label: 'Infraspinatus', data: [], borderColor: p.purple, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-        { label: 'Lat. Dorsi', data: [], borderColor: p.amber, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-      ],
+    data: { labels: [], datasets: [{ label: 'Muscle effort', data: [], borderColor: p.cyan, borderWidth: 2.5, pointRadius: 0, tension: 0.35, fill: true, backgroundColor: (c) => fill(c.chart.ctx) }] },
+    options: {
+      ...common,
+      plugins: { ...common.plugins, legend: { display: false }, tooltip: { ...common.plugins.tooltip, enabled: false } },
+      scales: { x: { ...common.scales.x, title: { display: true, text: 'Seconds into the exercise', color: p.muted, font } }, y: { ...common.scales.y, min: 0, ticks: { display: false }, title: { display: true, text: 'Effort (relative)', color: p.muted, font } } },
     },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, title: { display: true, text: 'mV', color: p.muted } } } },
-  });
-
-  charts.imu = new Chart(document.getElementById('imuChart').getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'Acc X', data: [], borderColor: p.crimson, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-        { label: 'Acc Y', data: [], borderColor: p.blue, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-        { label: 'Acc Z', data: [], borderColor: p.amber, borderWidth: 2, pointRadius: 0, tension: 0.35 },
-      ],
-    },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, title: { display: true, text: 'm/s²', color: p.muted } } } },
-  });
-
-  charts.ppg = new Chart(document.getElementById('ppgChart').getContext('2d'), {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: 'Pulse Wave', data: [], borderColor: p.cyan, borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true,
-        backgroundColor: (context) => gradientFill(context.chart.ctx, p.cyanFillStrong, p.cyanFillWeak),
-      }],
-    },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, title: { display: true, text: 'V', color: p.muted } } } },
   });
 
   charts.progression = new Chart(document.getElementById('fatigueProgressionChart').getContext('2d'), {
@@ -244,96 +265,70 @@ function initCharts() {
     data: {
       labels: [],
       datasets: [
-        { label: 'Performance Score', data: [], borderColor: p.cyan, borderWidth: 2.5, pointRadius: 0, tension: 0.35, yAxisID: 'y' },
-        { label: 'Recorded Borg RPE (self-report)', data: [], borderColor: p.muted, borderDash: [5, 5], borderWidth: 2, pointRadius: 2, yAxisID: 'y1' },
+        { label: 'Estimated effort', data: [], borderColor: p.cyan, borderWidth: 2.5, pointRadius: 0, tension: 0.3 },
+        { label: "Athlete's own rating", data: [], borderColor: p.amber, borderDash: [6, 4], borderWidth: 2, pointRadius: 3, spanGaps: true },
       ],
     },
     options: {
-      ...commonOptions,
+      ...common,
       scales: {
-        x: commonOptions.scales.x,
-        y: { position: 'left', min: 0, max: 100, title: { display: true, text: 'Performance Score', color: p.muted }, grid: commonOptions.scales.y.grid, ticks: commonOptions.scales.y.ticks },
-        y1: { position: 'right', min: 6, max: 20, title: { display: true, text: 'Borg RPE', color: p.muted }, grid: { display: false }, ticks: commonOptions.scales.y.ticks },
+        x: { ...common.scales.x, title: { display: true, text: 'Seconds into the exercise', color: p.muted, font } },
+        y: { ...common.scales.y, min: 6, max: 20, ticks: { ...common.scales.y.ticks, stepSize: 2 } },
       },
     },
   });
 
-  charts.spectral = new Chart(document.getElementById('muscleSpectralChart').getContext('2d'), {
-    type: 'bar',
-    data: { labels: [], datasets: [{ label: 'Current value (raw)', data: [], backgroundColor: p.cyanTint, borderRadius: 6, maxBarThickness: 34 }] },
-    options: commonOptions,
+  // Technical raw-signal charts (shown only inside the collapsed "Technical details")
+  charts.emg = new Chart(document.getElementById('emgChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Front shoulder muscle', data: [], borderColor: p.cyan, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Back shoulder muscle', data: [], borderColor: p.purple, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Back muscle', data: [], borderColor: p.amber, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+    ] },
+    options: withYTitle('Muscle signal (mV)'),
   });
-
-  charts.shapBar = new Chart(document.getElementById('shapBarChart').getContext('2d'), {
-    type: 'bar',
-    indexAxis: 'y',
-    data: { labels: [], datasets: [{ label: 'Overall importance', data: [], backgroundColor: p.cyan, borderRadius: 6 }] },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, grid: { display: false } } } },
+  charts.imu = new Chart(document.getElementById('imuChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Movement, direction 1', data: [], borderColor: p.crimson, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Movement, direction 2', data: [], borderColor: p.blue, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+      { label: 'Movement, direction 3', data: [], borderColor: p.amber, borderWidth: 1.5, pointRadius: 0, tension: 0.2 },
+    ] },
+    options: withYTitle('Arm movement (m/s²)'),
   });
-
-  charts.shapWaterfall = new Chart(document.getElementById('shapWaterfallChart').getContext('2d'), {
-    type: 'bar',
-    indexAxis: 'y',
-    data: { labels: [], datasets: [{ label: 'Effect on this moment\'s score', data: [], backgroundColor: (ctx) => (ctx.raw > 0 ? p.crimson : p.cyan), borderRadius: 6 }] },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, grid: { display: false } } } },
-  });
-
-  charts.loso = new Chart(document.getElementById('losoComparisonChart').getContext('2d'), {
-    type: 'bar',
-    data: { labels: ['Population Average', 'You (Personalized)'], datasets: [{ label: 'Fatigue risk (%)', data: [0, 0], backgroundColor: [p.neutralBar, p.cyanTintStrong], borderRadius: 8, maxBarThickness: 70 }] },
-    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, min: 0, max: 100 } } },
-  });
-
-  // Skill radar -- 4 real, independently-sourced metrics normalized to a
-  // common 0-100 scale for display only (see updatePersonalizationTab for
-  // the exact normalization of each axis). No fabricated axis.
-  charts.skillRadar = new Chart(document.getElementById('skillRadarChart').getContext('2d'), {
-    type: 'radar',
-    data: {
-      labels: ['Strength', 'Resilience', 'Focus', 'Endurance'],
-      datasets: [{
-        label: 'Skill Profile',
-        data: [0, 0, 0, 0],
-        backgroundColor: p.cyanRadarFill,
-        borderColor: p.cyan,
-        pointBackgroundColor: p.cyan,
-        pointBorderColor: p.pointBorder,
-        borderWidth: 2,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 500, easing: 'easeOutCubic' },
-      plugins: { legend: { display: false }, tooltip: commonOptions.plugins.tooltip },
-      scales: {
-        r: {
-          min: 0,
-          max: 100,
-          angleLines: { color: p.grid },
-          grid: { color: p.grid },
-          pointLabels: { color: p.text, font: { family: 'Space Grotesk', size: 10 } },
-          ticks: { display: false, stepSize: 25 },
-        },
-      },
-    },
+  charts.ppg = new Chart(document.getElementById('ppgChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: 'Pulse', data: [], borderColor: p.cyan, borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true, backgroundColor: (c) => fill(c.chart.ctx) }] },
+    options: withYTitle('Pulse signal (V)'),
   });
 }
 
-// Rebuilds every Chart.js instance with the current theme's palette and
-// replays the last real payload into them -- Chart.js datasets don't follow
-// CSS variables, so a theme switch destroys and recreates the charts rather
-// than leaving stale dark-mode colors on a light background.
+// Chart.js datasets don't follow CSS variables, so a theme switch rebuilds the
+// charts with the new palette and refills them from the data already received.
 function restyleChartsForTheme() {
-  if (!charts.emg) return;
+  if (!charts.effortTrend) return;
   Object.values(charts).forEach((c) => c && c.destroy());
   Object.keys(charts).forEach((k) => delete charts[k]);
   initCharts();
-  if (lastPayload) updateAllTabs(lastPayload);
+  refreshHistoryCharts();
+  if (lastPayload) updateRawSignalCharts(lastPayload);
+}
+
+function refreshHistoryCharts() {
+  if (!charts.effortTrend) return;
+  charts.effortTrend.data.labels = effortHistory.map((h) => Math.round(h.t));
+  charts.effortTrend.data.datasets[0].data = effortHistory.map((h) => h.rms);
+  charts.effortTrend.update('none');
+
+  charts.progression.data.labels = ratingHistory.map((h) => Math.round(h.t));
+  charts.progression.data.datasets[0].data = ratingHistory.map((h) => h.estimate);
+  charts.progression.data.datasets[1].data = ratingHistory.map((h) => h.reported);
+  charts.progression.update('none');
 }
 
 // ---------------------------------------------------------------------------
-// Subject list + replay stream
+// Athlete list + live stream
 // ---------------------------------------------------------------------------
 
 async function loadSubjects() {
@@ -355,8 +350,8 @@ async function loadSubjects() {
       startReplayStream(data.subjects[0]);
     }
   } catch (err) {
-    setConnectionStatus('error', 'Backend unavailable');
-    showError(`Could not load the athlete list from the backend (${err.message}). Start it with: uvicorn backend.api.app:app --reload`);
+    setConnectionStatus('error', 'Cannot reach the backend');
+    showError(`The athlete list could not be loaded (${err.message}). Start the backend with: uvicorn backend.api.app:app --reload`);
     select.innerHTML = '<option value="">Backend unavailable</option>';
   }
 }
@@ -366,24 +361,28 @@ function startReplayStream(subjectId) {
     currentEventSource.close();
     currentEventSource = null;
   }
-  currentSubjectId = subjectId;
-  fatigueHistory.length = 0;
-  lastDecisionNarrative = null;
-  lastPriorityLabel = null;
+  lastPayload = null;
+  lastAdvice = null;
+  effortHistory.length = 0;
+  ratingHistory.length = 0;
+  refreshHistoryCharts();
   resetCoachFeed();
+  setText('heroRecommendation', 'Open the Coach tab and tap "Check in" for advice.');
+  setText('heroRecommendationSub', '');
+
   const contentBody = document.querySelector('.content-body');
   if (contentBody) {
     contentBody.style.opacity = '0';
     contentBody.style.transition = 'opacity 0.25s ease';
     requestAnimationFrame(() => { contentBody.style.opacity = '1'; });
   }
-  setConnectionStatus('loading', `Loading ${subjectId}'s session (first load can take up to a minute)...`);
+  setConnectionStatus('loading', `Loading Athlete ${subjectId}. The first time can take a few minutes...`);
 
   const source = new EventSource(`${API_BASE}/api/replay/stream/${subjectId}?speed_ms=600`);
   currentEventSource = source;
 
   source.onopen = () => {
-    setConnectionStatus('connected', `Live session streaming for ${subjectId}`);
+    setConnectionStatus('connected', `Live: Athlete ${subjectId}`);
     clearError();
   };
 
@@ -402,249 +401,194 @@ function startReplayStream(subjectId) {
   };
 
   source.onerror = () => {
-    setConnectionStatus('error', 'Backend unavailable -- live stream disconnected');
-    showError('Lost connection to the backend replay stream. Confirm the API is running: uvicorn backend.api.app:app --reload');
+    setConnectionStatus('error', 'Connection lost');
+    showError('The live view lost its connection to the backend. Make sure it is running: uvicorn backend.api.app:app --reload');
   };
 }
 
 // ---------------------------------------------------------------------------
-// Per-tab real-data updates
+// Per-tab updates
 // ---------------------------------------------------------------------------
 
 function updateAllTabs(payload) {
+  trackHistory(payload);
   updateHero(payload);
-  updateSignalsTab(payload);
-  updatePredictionTab(payload);
-  updateExplainabilityTab(payload);
-  updatePersonalizationTab(payload);
-  document.getElementById('triggerAgentCheck').disabled = false;
+  updateRightNow(payload);
+  updateHowTired(payload);
+  updateWhy(payload);
+  updateAboutYou(payload);
+  document.getElementById('triggerAgentCheck').disabled = !estimateReady(payload);
   updateRpeVsThreshold();
 }
 
 function mean(arr) {
-  if (!arr || arr.length === 0) return null;
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
+  return arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+}
+
+function rmsOf(arr) {
+  return arr && arr.length ? Math.sqrt(arr.reduce((a, b) => a + b * b, 0) / arr.length) : null;
+}
+
+function trackHistory(payload) {
+  const t = payload.elapsed_seconds;
+  const rms = rmsOf(payload.signals.emg.channels.anterior_deltoid);
+  if (rms !== null) effortHistory.push({ t, rms });
+  if (effortHistory.length > MAX_HISTORY_POINTS) effortHistory.shift();
+
+  const reported = payload.ground_truth.rpe_nearest;
+  ratingHistory.push({ t, estimate: estimateReady(payload) ? currentRpeEstimate(payload).value : null, reported });
+  if (ratingHistory.length > MAX_HISTORY_POINTS) ratingHistory.shift();
+
+  refreshHistoryCharts();
 }
 
 function updateHero(payload) {
-  const probabilityPct = Math.round(payload.prediction.probability_fatigued * 100);
-  const score = 100 - probabilityPct;
-
-  document.getElementById('heroAthleteId').textContent = payload.subject_id;
-
-  animateCounter(document.getElementById('heroScoreValue'), score, { decimals: 0 });
-  setRingProgress(document.getElementById('heroRingProgress'), score);
-
-  const { tone, label } = scoreTone(score);
+  const value = currentRpeEstimate(payload).value;
   const pill = document.getElementById('heroStatusPill');
-  pill.textContent = label;
-  pill.className = `status-pill ${tone}`;
-  document.getElementById('heroFatigueSub').textContent = `${probabilityPct}% fatigue risk · ${payload.direction.replace('_', ' ')}`;
+  const ring = document.getElementById('heroRingProgress');
+  const valueEl = document.getElementById('heroScoreValue');
 
-  // The recommendation slot only ever shows a real AI Coach output (from the
-  // last real check-in); it never fabricates a recommendation from raw
-  // prediction data alone.
-  if (lastDecisionNarrative) {
-    document.getElementById('heroRecommendation').textContent = lastDecisionNarrative;
-    document.getElementById('heroRecommendationSub').textContent = lastPriorityLabel ? `Priority: ${lastPriorityLabel}` : 'From your latest AI Coach check-in';
+  setText('heroAthleteId', payload.subject_id);
+  setText('heroActivity', ` · ${capitalize(payload.direction.replace('_', ' '))}`);
+
+  if (estimateReady(payload)) {
+    const status = effortStatus(value);
+    animateCounter(valueEl, value, { decimals: 0 });
+    setRingProgress(ring, ((value - 6) / 14) * 100);
+    pill.textContent = status.word;
+    pill.className = `status-pill ${status.tone}`;
+    setText('heroEffortSub', `Effort is ${effortWord(value).toLowerCase()}, ${value.toFixed(0)} out of 20.`);
+  } else {
+    valueEl.dataset.rawValue = '0';
+    valueEl.textContent = '--';
+    setRingProgress(ring, 0);
+    pill.textContent = 'Warming up';
+    pill.className = 'status-pill tone-neutral';
+    setText('heroEffortSub', `The careful reading starts after ${warmupSeconds(payload)} seconds of this exercise.`);
+  }
+
+  if (lastAdvice) {
+    setText('heroRecommendation', lastAdvice.text);
+    setText('heroRecommendationSub', `From your latest check-in: ${lastAdvice.status}`);
+  } else if (estimateReady(payload)) {
+    setText('heroRecommendation', 'Open the Coach tab and tap "Check in" for advice.');
+    setText('heroRecommendationSub', '');
+  } else {
+    setText('heroRecommendation', 'The coach can give advice once the careful reading starts.');
+    setText('heroRecommendationSub', '');
   }
 }
 
-function updateSignalsTab(payload) {
+function updateRightNow(payload) {
+  const zscores = payload.personalization.feature_baseline_zscores || {};
+  const seconds = Math.round(payload.elapsed_seconds);
+  setText('activityText', `${capitalize(payload.direction.replace('_', ' '))} · ${payload.intensity_band}% of maximum strength · ${seconds} ${seconds === 1 ? 'second' : 'seconds'} in`);
+  setText('tileEffortValue', usualWord(zscores.rms));
+  setText('tileFatigueValue', tirednessSignWord(zscores.median_frequency));
+  const reported = payload.ground_truth.rpe_nearest;
+  setText('tileReportedValue', reported === null ? 'No rating right now' : effortLabel(reported));
+  updateRawSignalCharts(payload);
+}
+
+function updateRawSignalCharts(payload) {
+  if (!document.getElementById('rawSignalsDetails').open) return; // only draw what is visible
   const emg = payload.signals.emg.channels;
-  const emgLabels = Array.from({ length: (emg.anterior_deltoid || []).length }, (_, i) => i);
-  charts.emg.data.labels = emgLabels;
+  const labels = (arr) => Array.from({ length: (arr || []).length }, (_, i) => i);
+  charts.emg.data.labels = labels(emg.anterior_deltoid);
   charts.emg.data.datasets[0].data = emg.anterior_deltoid || [];
   charts.emg.data.datasets[1].data = emg.infraspinatus || [];
   charts.emg.data.datasets[2].data = emg.latissimus_dorsi || [];
   charts.emg.update('none');
 
   const imu = payload.signals.imu;
-  const imuLabels = Array.from({ length: (imu.acc_x || []).length }, (_, i) => i);
-  charts.imu.data.labels = imuLabels;
+  charts.imu.data.labels = labels(imu.acc_x);
   charts.imu.data.datasets[0].data = imu.acc_x || [];
   charts.imu.data.datasets[1].data = imu.acc_y || [];
   charts.imu.data.datasets[2].data = imu.acc_z || [];
   charts.imu.update('none');
 
-  const ppg = payload.signals.ppg;
-  const ppgValues = ppg ? ppg.values : [];
-  charts.ppg.data.labels = Array.from({ length: ppgValues.length }, (_, i) => i);
+  const ppgValues = payload.signals.ppg ? payload.signals.ppg.values : [];
+  charts.ppg.data.labels = labels(ppgValues);
   charts.ppg.data.datasets[0].data = ppgValues;
   charts.ppg.update('none');
-
-  const rmsEntry = payload.explainability.local_top_features.find((f) => f.feature === 'rms');
-  document.getElementById('emgRmsVal').innerHTML = rmsEntry
-    ? `${rmsEntry.raw_value.toFixed(4)} <span class="unit">(rms)</span>`
-    : '-- <span class="unit"></span>';
-
-  const accZMean = mean(imu.acc_z);
-  document.getElementById('imuJerkVal').innerHTML = accZMean !== null ? `${accZMean.toFixed(2)} <span class="unit">m/s²</span>` : '--';
-
-  const ppgMean = mean(ppgValues);
-  document.getElementById('ppgHrVal').innerHTML = ppgMean !== null ? `${ppgMean.toFixed(3)} <span class="unit">V (mean)</span>` : '--';
-
-  document.getElementById('conditionBadge').textContent = `Load ${payload.intensity_band}%`;
-  document.getElementById('conditionDirection').textContent = payload.direction.replace('_', ' ');
-  document.getElementById('conditionIdText').textContent = payload.condition_id;
 }
 
-function updatePredictionTab(payload) {
+function updateHowTired(payload) {
   const pred = payload.prediction;
-  const probabilityPct = Math.round(pred.probability_fatigued * 100);
-  const score = 100 - probabilityPct;
+  const value = currentRpeEstimate(payload).value;
+  const reported = payload.ground_truth.rpe_nearest;
 
-  animateCounter(document.getElementById('currentProbability'), score, { decimals: 0 });
-  setRingProgress(document.getElementById('scoreRingProgress'), score);
+  const ready = estimateReady(payload);
+  setText('effortHeadline', ready ? `${effortWord(value)}, ${value.toFixed(1)} out of 20` : `Warming up. The careful reading starts after ${warmupSeconds(payload)} seconds of this exercise.`);
+  setText('estimatedRpeText', ready ? effortLabel(value) : 'Not ready yet');
+  setText('groundTruthRpeText', reported === null ? 'No rating right now' : effortLabel(reported));
+  setText('fatigueRiskText', `${Math.round(pred.probability_fatigued * 100)}%`);
+  setText('estimatedRpeSource', describeEstimateMethod(payload));
 
-  document.getElementById('fatigueRiskText').textContent = `${probabilityPct}%`;
-  document.getElementById('predictedClassText').textContent = pred.predicted_label;
-  document.getElementById('confidenceText').textContent = `${(pred.confidence * 100).toFixed(1)}%`;
-  document.getElementById('estimatedRpeText').textContent = `${pred.estimated_rpe_proxy} / 20`;
-
-  const rpe = payload.ground_truth.rpe_nearest;
-  document.getElementById('groundTruthRpeText').textContent = rpe !== null ? `${rpe.toFixed(1)} / 20` : 'n/a for this moment';
-  document.getElementById('currentTaskText').textContent = `${payload.direction} (${payload.intensity_band}% MVIC)`;
-
-  const { tone, label } = scoreTone(score);
-  const badge = document.getElementById('predictedLabelBadge');
-  badge.textContent = label;
-  badge.className = tone === 'tone-alert' ? 'rpe-status-label danger' : 'rpe-status-label';
-
-  fatigueHistory.push({ step: payload.step, score, rpe });
-  if (fatigueHistory.length > MAX_HISTORY_POINTS) fatigueHistory.shift();
-  charts.progression.data.labels = fatigueHistory.map((h) => h.step);
-  charts.progression.data.datasets[0].data = fatigueHistory.map((h) => h.score);
-  charts.progression.data.datasets[1].data = fatigueHistory.map((h) => h.rpe);
-  charts.progression.update('none');
-
-  const features = payload.explainability.local_top_features;
-  charts.spectral.data.labels = features.map((f) => translateFeature(f.feature).label);
-  charts.spectral.data.datasets[0].data = features.map((f) => f.raw_value);
-  charts.spectral.update('none');
+  const toPercent = (v) => `${clamp(((v - 6) / 14) * 100, 0, 100)}%`;
+  const estimateMarker = document.getElementById('meterEstimate');
+  estimateMarker.style.display = ready ? 'block' : 'none';
+  if (ready) estimateMarker.style.left = toPercent(value);
+  const reportedMarker = document.getElementById('meterReported');
+  reportedMarker.style.display = reported === null ? 'none' : 'block';
+  if (reported !== null) reportedMarker.style.left = toPercent(reported);
 }
 
-function updateExplainabilityTab(payload) {
+function updateWhy(payload) {
   const local = payload.explainability.local_top_features.slice().sort((a, b) => Math.abs(b.shap) - Math.abs(a.shap));
-  const maxAbsShap = Math.max(...local.map((f) => Math.abs(f.shap)), 0.0001);
 
-  const setInsightRow = (idx, feature) => {
-    const titleEl = document.getElementById(`shapTopFeature${idx}`);
-    const descEl = document.getElementById(`shapTopFeature${idx}Desc`);
-    const impactEl = document.getElementById(`shapTopFeature${idx}Val`);
-    const barEl = document.getElementById(`shapTopFeature${idx}Bar`);
+  const setRow = (idx, feature) => {
     if (!feature) {
-      titleEl.textContent = '--';
-      descEl.textContent = 'Waiting for live data...';
-      impactEl.textContent = '--';
-      impactEl.className = 'insight-impact';
-      barEl.style.width = '0%';
+      setText(`shapTopFeature${idx}`, '--');
+      setText(`shapTopFeature${idx}Desc`, 'Waiting for live data...');
+      setText(`shapTopFeature${idx}Val`, '--');
       return;
     }
     const t = translateFeature(feature.feature);
-    titleEl.textContent = t.label;
-    descEl.textContent = t.desc;
-    const increasing = feature.shap >= 0;
-    impactEl.textContent = increasing ? 'Increasing risk' : 'Reducing risk';
-    impactEl.className = `insight-impact ${increasing ? 'up' : 'down'}`;
-    barEl.className = `insight-bar-fill ${increasing ? 'up' : 'down'}`;
-    barEl.style.width = `${Math.round((Math.abs(feature.shap) / maxAbsShap) * 100)}%`;
+    const up = feature.shap >= 0;
+    setText(`shapTopFeature${idx}`, t.label);
+    setText(`shapTopFeature${idx}Desc`, t.desc);
+    const chip = document.getElementById(`shapTopFeature${idx}Val`);
+    chip.textContent = up ? 'Pushes the reading up' : 'Pulls the reading down';
+    chip.className = `chip ${up ? 'chip-up' : 'chip-down'}`;
   };
+  setRow(1, local[0]);
+  setRow(2, local[1]);
+  setRow(3, local[2]);
 
-  setInsightRow(1, local[0]);
-  setInsightRow(2, local[1]);
-  setInsightRow(3, local[2]);
-  document.getElementById('shapConfidence').textContent = `${(payload.prediction.confidence * 100).toFixed(1)}%`;
-
-  const techDetails = document.getElementById('shapTechDetails');
-  techDetails.textContent = local
-    .map((f) => `${f.feature}: ${f.shap >= 0 ? '+' : ''}${f.shap.toFixed(4)} SHAP  (raw value ${f.raw_value.toFixed(4)})`)
-    .join('\n');
-
-  const global = payload.explainability.global_top_features;
-  charts.shapBar.data.labels = global.map((f) => translateFeature(f.feature).label);
-  charts.shapBar.data.datasets[0].data = global.map((f) => f.importance);
-  charts.shapBar.update('none');
-
-  charts.shapWaterfall.data.labels = local.map((f) => translateFeature(f.feature).label);
-  charts.shapWaterfall.data.datasets[0].data = local.map((f) => f.shap);
-  charts.shapWaterfall.update('none');
+  setText('shapTechDetails', local.map((f) => `${f.feature}: ${f.shap >= 0 ? '+' : ''}${f.shap.toFixed(4)}  (value ${f.raw_value.toFixed(4)})`).join('\n'));
+  setText('shapGlobalDetails', payload.explainability.global_top_features.map((f) => `${f.feature}: ${f.importance.toFixed(4)}`).join('\n'));
 }
 
-// Reference max used only to normalize MVIC force (N) onto a 0-100 display
-// axis for the skill radar / power ring -- a presentation-layer scale, not
-// a clinical threshold.
-const MVIC_DISPLAY_MAX_N = 150;
-
-function updatePersonalizationTab(payload) {
+function updateAboutYou(payload) {
   const profile = payload.personalization.profile;
-  document.getElementById('profileSubjectId').textContent = payload.subject_id;
-  document.getElementById('playerCardName').textContent = `Athlete ${payload.subject_id}`;
+  setText('profileSubjectId', `Athlete ${payload.subject_id}`);
 
-  let dominantHandLabel = '--';
   if (profile.demographic) {
-    document.getElementById('profileSexAge').textContent = `${profile.demographic.sex} / ${profile.demographic.age} years`;
-    document.getElementById('profileHand').textContent = profile.demographic.dominant_hand;
-    dominantHandLabel = profile.demographic.dominant_hand
-      ? profile.demographic.dominant_hand.charAt(0).toUpperCase() + profile.demographic.dominant_hand.slice(1)
-      : '--';
-    document.getElementById('profileCardArm').textContent = dominantHandLabel;
-    document.getElementById('profileCardDemo').textContent = `${profile.demographic.sex}, ${profile.demographic.age}y`;
-    document.getElementById('playerMetaArm').textContent = dominantHandLabel;
-    document.getElementById('playerMetaDemo').textContent = `${profile.demographic.sex}, ${profile.demographic.age}y`;
+    const d = profile.demographic;
+    setText('profileCardDemo', `${d.age} years · ${d.sex}`);
+    setText('profileCardArm', d.dominant_hand ? capitalize(d.dominant_hand) : 'Not recorded');
   }
-  if (profile.anthropometric) {
-    document.getElementById('profileHeightMass').textContent = profile.demographic
-      ? `${profile.demographic.height_cm} cm / ${profile.anthropometric.mass_kg} kg`
-      : `${profile.anthropometric.mass_kg} kg`;
-    document.getElementById('profileBmiFat').textContent = `${profile.anthropometric.bmi.toFixed(1)} / ${profile.anthropometric.body_fat_percent}%`;
-    document.getElementById('profileCardBody').textContent = profile.anthropometric.bmi.toFixed(1);
+  if (profile.demographic && profile.anthropometric) {
+    setText('profileHeightMass', `${profile.demographic.height_cm} cm · ${profile.anthropometric.mass_kg} kg`);
   }
-
-  let strengthPct = 0;
   if (profile.mvic) {
-    document.getElementById('profileMvicIr').textContent = `${profile.mvic.ir_mean_n.toFixed(1)} N`;
-    document.getElementById('profileMvicEr').textContent = `${profile.mvic.er_mean_n.toFixed(1)} N`;
-    document.getElementById('profileCardStrength').textContent = `${profile.mvic.ir_mean_n.toFixed(0)} / ${profile.mvic.er_mean_n.toFixed(0)} N`;
-    document.getElementById('playerMetaStrength').textContent = `${profile.mvic.ir_mean_n.toFixed(0)} / ${profile.mvic.er_mean_n.toFixed(0)} N`;
-    strengthPct = clamp(((profile.mvic.ir_mean_n + profile.mvic.er_mean_n) / 2 / MVIC_DISPLAY_MAX_N) * 100, 0, 100);
+    setText('profileCardStrength', `${profile.mvic.ir_mean_n.toFixed(0)} N in · ${profile.mvic.er_mean_n.toFixed(0)} N out`);
   }
 
-  const generic = Math.round(payload.personalization.generic_probability * 100);
-  const personalized = Math.round(payload.personalization.personalized_probability * 100);
-  charts.loso.data.datasets[0].data = [generic, personalized];
-  charts.loso.update('none');
+  const h = profile.fatigue_history;
+  if (h && h.mean_rpe !== null && h.mean_rpe !== undefined) {
+    setText('historyText', `Across ${h.n_trials} earlier exercises, this athlete rated their effort between ${h.min_rpe.toFixed(0)} (${effortWord(h.min_rpe).toLowerCase()}) and ${h.max_rpe.toFixed(0)} (${effortWord(h.max_rpe).toLowerCase()}), averaging ${h.mean_rpe.toFixed(1)} out of 20.`);
+  } else {
+    setText('historyText', 'No earlier effort ratings are on record for this athlete.');
+  }
 
-  // Skill radar + Power Level ring: four independently-sourced real values,
-  // each normalized to 0-100 for a common display scale only.
-  //   Strength   = average MVIC (IR/ER) vs. MVIC_DISPLAY_MAX_N
-  //   Resilience = this moment's real Performance Score (100 - fatigue risk %)
-  //   Focus      = the model's own real confidence for this prediction
-  //   Endurance  = real recorded Borg RPE (self-report) inverted onto 0-100
-  //                when available for this window, else falls back to
-  //                Resilience so the radar never shows a fabricated value.
-  const resiliencePct = 100 - Math.round(payload.prediction.probability_fatigued * 100);
-  const focusPct = payload.prediction.confidence * 100;
-  const groundTruthRpe = payload.ground_truth.rpe_nearest;
-  const endurancePct = groundTruthRpe !== null && groundTruthRpe !== undefined
-    ? clamp(100 - (groundTruthRpe / 20) * 100, 0, 100)
-    : resiliencePct;
-
-  charts.skillRadar.data.datasets[0].data = [strengthPct, resiliencePct, focusPct, endurancePct];
-  charts.skillRadar.update('none');
-
-  const powerLevel = Math.round((strengthPct + resiliencePct + focusPct + endurancePct) / 4);
-  animateCounter(document.getElementById('playerPowerValue'), powerLevel, { decimals: 0 });
-  setRingProgress(document.getElementById('playerPowerRing'), powerLevel);
-
-  const tagEl = document.getElementById('playerCardTag');
-  if (powerLevel >= 75) tagEl.textContent = 'Elite Tier Performer';
-  else if (powerLevel >= 50) tagEl.textContent = 'Competitive Tier';
-  else tagEl.textContent = 'Building Tier';
+  setText('genericRiskText', `${Math.round(payload.personalization.generic_probability * 100)}%`);
+  setText('personalRiskText', `${Math.round(payload.personalization.personalized_probability * 100)}%`);
 }
 
 // ---------------------------------------------------------------------------
-// Navigation
+// Navigation, playback, theme
 // ---------------------------------------------------------------------------
 
 function positionNavIndicator(activeBtn) {
@@ -656,15 +600,12 @@ function positionNavIndicator(activeBtn) {
 
 function initNavigation() {
   const tabs = document.querySelectorAll('.nav-item');
-  const pageTitle = document.getElementById('pageTitle');
-  const pageSubtitle = document.getElementById('pageSubtitle');
-
   const titles = {
-    signals: { title: 'Live Performance', sub: 'Real muscle, movement, and heart-response signals, streamed live from your last session' },
-    predictions: { title: 'Performance Score', sub: 'A live, human-friendly read on how your body is handling this session' },
-    explainability: { title: 'AI Insights', sub: "Why did the AI reach this conclusion? Here's what mattered most" },
-    personalization: { title: 'Athlete Profile', sub: 'Real demographic, strength, and baseline data personalizing every prediction' },
-    agents: { title: 'AI Coach', sub: 'Your real-time coaching assistant, powered by the live agent backend' },
+    signals: { title: 'Right Now', sub: "What is happening in the athlete's body at this moment." },
+    predictions: { title: 'How Tired?', sub: 'How hard the athlete is working, in plain words.' },
+    explainability: { title: 'Why?', sub: "What is behind the current reading." },
+    personalization: { title: 'About You', sub: 'What we know about this athlete.' },
+    agents: { title: 'Coach', sub: 'Advice on what to do next.' },
   };
 
   tabs.forEach((tab) => {
@@ -675,28 +616,34 @@ function initNavigation() {
       document.querySelectorAll('.tab-content').forEach((content) => content.classList.remove('active'));
       const activeEl = document.getElementById(`tab-${tab.dataset.tab}`);
       if (activeEl) activeEl.classList.add('active');
-      if (titles[tab.dataset.tab]) {
-        pageTitle.textContent = titles[tab.dataset.tab].title;
-        pageSubtitle.textContent = titles[tab.dataset.tab].sub;
+      const info = titles[tab.dataset.tab];
+      if (info) {
+        setText('pageTitle', info.title);
+        setText('pageSubtitle', info.sub);
       }
     });
   });
 
-  const initialActive = document.querySelector('.nav-item.active') || tabs[0];
-  positionNavIndicator(initialActive);
+  positionNavIndicator(document.querySelector('.nav-item.active') || tabs[0]);
   window.addEventListener('resize', () => positionNavIndicator(document.querySelector('.nav-item.active')));
+
+  // Charts drawn while a section is closed have no size; fill them when it opens.
+  document.getElementById('rawSignalsDetails').addEventListener('toggle', (e) => {
+    if (e.target.open && lastPayload) {
+      updateRawSignalCharts(lastPayload);
+      ['emg', 'imu', 'ppg'].forEach((k) => charts[k] && charts[k].resize());
+    }
+  });
 }
 
 function initPlaybackToggle() {
   const btn = document.getElementById('togglePlayback');
-  const text = document.getElementById('playbackBtnText');
-  const iconWrap = document.getElementById('playbackIconWrap');
   const pausedBadge = document.getElementById('pausedBadge');
-
   btn.addEventListener('click', () => {
     isPlaying = !isPlaying;
-    text.textContent = isPlaying ? 'Pause Stream' : 'Resume Stream';
-    iconWrap.innerHTML = `<i data-lucide="${isPlaying ? 'pause' : 'play'}" style="width: 14px; height: 14px;"></i>`;
+    setText('playbackBtnText', isPlaying ? 'Pause' : 'Resume');
+    // Lucide turns <i> into a static <svg>, so swap in a fresh placeholder to change the icon.
+    document.getElementById('playbackIconWrap').innerHTML = `<i data-lucide="${isPlaying ? 'pause' : 'play'}" style="width: 14px; height: 14px;"></i>`;
     btn.classList.toggle('is-paused', !isPlaying);
     pausedBadge.style.display = isPlaying ? 'none' : 'inline-block';
     refreshIcons();
@@ -709,65 +656,36 @@ function initSubjectSelector() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Theme toggle (dark / light) -- a display preference only. Persisted in
-// localStorage so it survives a reload; never touches the replay stream,
-// the subject selection, or any fetched data.
-// ---------------------------------------------------------------------------
-
 const THEME_STORAGE_KEY = 'athlete-intelligence-theme';
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem(THEME_STORAGE_KEY, theme);
-
-  // Lucide converts <i data-lucide> into a rendered <svg> the first time
-  // createIcons() runs; simply updating data-lucide on that svg and calling
-  // createIcons() again does not re-render it. Swapping in a fresh <i>
-  // placeholder guarantees the icon actually changes.
-  const iconWrap = document.getElementById('themeToggleIconWrap');
-  const label = document.getElementById('themeToggleText');
-  if (iconWrap) iconWrap.innerHTML = `<i data-lucide="${theme === 'light' ? 'sun' : 'moon'}" style="width: 14px; height: 14px;"></i>`;
-  if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
+  document.getElementById('themeToggleIconWrap').innerHTML = `<i data-lucide="${theme === 'light' ? 'sun' : 'moon'}" style="width: 14px; height: 14px;"></i>`;
+  setText('themeToggleText', theme === 'light' ? 'Light' : 'Dark');
   refreshIcons();
-
   restyleChartsForTheme();
 }
 
 function initThemeToggle() {
-  const saved = localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
-  applyTheme(saved);
-
+  applyTheme(localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark');
   document.getElementById('themeToggle').addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-    applyTheme(current === 'light' ? 'dark' : 'light');
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
 }
 
 // ---------------------------------------------------------------------------
-// AI Coach -- real backend only, no local fallback simulation. The primary
-// output is a structured Recommendation Card built directly from the real,
-// already-computed fields on DecisionAndReportingAgent's result
-// (backend/agents/decision_agent.py: action_required, recommendation) --
-// nothing here is inferred or reworded by the frontend. Supporting agent
-// narratives appear underneath as short, calm cards. Avatars are abstract
-// Lucide glyphs (radio tower / dna / lightbulb / brain circuit), never a
-// human icon.
+// Coach -- real backend only. The advice mirrors the Decision Agent's own
+// three outcomes and numbers (backend/agents/decision_agent.py); its exact
+// sentence is always shown underneath.
 // ---------------------------------------------------------------------------
 
-// Maps the backend's real `action_required` value to display language.
-// CONTINUE_MONITORING / REST_RECOMMENDED / IMMEDIATE_TERMINATION are the
-// only three values DecisionAndReportingAgent ever produces.
-const PRIORITY_DISPLAY = {
-  CONTINUE_MONITORING: { label: 'Normal', tone: '', badgeTone: 'badge-success', recovery: 'Recovering Well' },
-  REST_RECOMMENDED: { label: 'Elevated', tone: 'tone-alert', badgeTone: 'badge-moderate', recovery: 'Rest Advised' },
-  IMMEDIATE_TERMINATION: { label: 'Critical', tone: 'tone-alert', badgeTone: 'badge-alert', recovery: 'Stop & Recover' },
+const PLAIN_ADVICE = {
+  CONTINUE_MONITORING: { status: 'Keep going', tone: '', text: "You're in a safe range. Keep going. The coach will keep watching." },
+  REST_RECOMMENDED: { status: 'Slow down', tone: 'tone-alert', text: "You're working hard. Lower the load by about 20%, or rest for around a minute." },
+  IMMEDIATE_TERMINATION: { status: 'Stop and rest', tone: 'tone-alert', text: 'Stop the exercise now and rest for at least 3 minutes.' },
 };
 
-// Badge ids for the "Meet Your AI Team" roster -- reflect the real, already
-// -returned `success` / `warnings` / `action_required` fields from each
-// agent's result (backend/api/app.py already exposes these; the frontend
-// previously just never displayed them).
 const AGENT_BADGE_IDS = {
   data_agent: 'dataAgentBadge',
   personalization_agent: 'personalizationAgentBadge',
@@ -788,115 +706,87 @@ function resetAgentBadges() {
 
 function resetCoachFeed() {
   const feed = document.getElementById('agentLogs');
-  if (feed) feed.innerHTML = '<div class="coach-placeholder">Select an athlete and click "Check In With Coach" to get a live assessment.</div>';
-  const slot = document.getElementById('recommendationCardSlot');
-  if (slot) slot.innerHTML = '';
+  if (feed) feed.innerHTML = '<div class="coach-placeholder">Tap "Check in" to see each step.</div>';
+  document.getElementById('recommendationCardSlot').innerHTML = '';
   resetAgentBadges();
   document.getElementById('triggerAgentCheck').disabled = true;
-  document.getElementById('currentRpeVsThreshold').textContent = 'Waiting for live data...';
+  setText('currentRpeVsThreshold', 'Waiting for live data...');
 }
 
-function addCoachBubble({ icon, name, text, thinking = false }) {
+function addCoachBubble({ name, text }) {
   const feed = document.getElementById('agentLogs');
   const placeholder = feed.querySelector('.coach-placeholder');
   if (placeholder) placeholder.remove();
-
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const bubble = document.createElement('div');
-  bubble.className = `coach-bubble ${thinking ? 'is-thinking' : ''}`;
+  bubble.className = 'coach-bubble';
   bubble.innerHTML = `
-    <div class="coach-avatar"><i data-lucide="${icon}"></i></div>
     <div class="coach-body">
-      <div class="coach-meta">
-        <span class="coach-agent-name">${name}</span>
-        <span class="coach-timestamp">${time}</span>
-      </div>
+      <div class="coach-meta"><span class="coach-agent-name">${name}</span><span class="coach-timestamp">${time}</span></div>
       <div class="coach-text">${text}</div>
-    </div>
-  `;
+    </div>`;
   feed.prepend(bubble);
-  refreshIcons();
-  return bubble;
 }
 
-// Live comparison of this moment's real RPE-proxy reading against the
-// coach's alert threshold -- both values are already displayed elsewhere
-// on the dashboard, just not side by side where the sensitivity slider
-// makes the comparison meaningful.
 function updateRpeVsThreshold() {
-  const el = document.getElementById('currentRpeVsThreshold');
-  if (!el || !lastPayload) return;
-  const current = lastPayload.prediction.estimated_rpe_proxy;
+  if (!lastPayload) return;
+  if (!estimateReady(lastPayload)) {
+    setText('currentRpeVsThreshold', `The coach can give advice once the careful reading starts (after ${warmupSeconds(lastPayload)} seconds of this exercise).`);
+    return;
+  }
+  const current = currentRpeEstimate(lastPayload).value;
   const threshold = parseFloat(document.getElementById('alertThreshold').value);
   const cls = current >= threshold ? 'over-threshold' : 'under-threshold';
-  el.innerHTML = `Current reading: <span class="${cls}">${current.toFixed(1)}</span> · Threshold: ${threshold.toFixed(1)}`;
+  document.getElementById('currentRpeVsThreshold').innerHTML =
+    `Right now: <span class="${cls}">${effortWord(current)} (${current.toFixed(1)})</span> · You'll be warned at: ${effortWord(threshold)} (${threshold.toFixed(1)})`;
 }
 
-function renderRecommendationCard(decisionData, confidencePct) {
-  const slot = document.getElementById('recommendationCardSlot');
-  const info = PRIORITY_DISPLAY[decisionData.action_required] || { label: decisionData.action_required, tone: '', recovery: '--' };
-  lastPriorityLabel = info.label;
+function renderCoachThinking() {
+  document.getElementById('recommendationCardSlot').innerHTML =
+    '<div class="recommendation-card margin-top"><div class="thinking"><span class="thinking-dots"><span></span><span></span><span></span></span> The coach is looking at the current moment...</div></div>';
+}
 
+function renderRecommendationCard(decisionData, effortValue) {
+  const advice = PLAIN_ADVICE[decisionData.action_required] || { status: decisionData.action_required, tone: '', text: decisionData.recommendation };
+  lastAdvice = { status: advice.status, text: advice.text };
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const slot = document.getElementById('recommendationCardSlot');
   slot.innerHTML = `
-    <div class="recommendation-card ${info.tone} margin-top">
+    <div class="recommendation-card ${advice.tone} margin-top">
       <div class="recommendation-header">
-        <h4><i data-lucide="sparkles"></i> Coach Recommendation</h4>
+        <span class="advice-status">${advice.status}</span>
         <span class="coach-timestamp">${time}</span>
       </div>
-      <div class="recommendation-fields">
-        <div><span class="rf-label">Priority</span><span class="rf-value">${info.label}</span></div>
-        <div><span class="rf-label">Confidence</span><span class="rf-value">${confidencePct}%</span></div>
-        <div><span class="rf-label">Recovery Outlook</span><span class="rf-value">${info.recovery}</span></div>
-      </div>
-      <div class="recommendation-action"><strong>Suggested Action:</strong> ${decisionData.recommendation}</div>
-    </div>
-  `;
-  refreshIcons();
+      <p class="advice-text">${advice.text}</p>
+      <p class="advice-context">Effort right now: ${effortLabel(effortValue)}</p>
+      <details class="advice-original"><summary>The coach's exact words</summary><p>${decisionData.recommendation}</p></details>
+    </div>`;
   slot.querySelector('.recommendation-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Turns each agent's real `success` (and, for the Signal Analyst, real
-// `warnings_count`) into a roster badge -- these fields already come back
-// from POST /api/agents/analyze today; nothing new is requested from the
-// backend.
 function badgeForDataAgent(res) {
-  if (!res.success) return { text: 'Issue Detected', tone: 'badge-alert' };
-  const warnings = res.data && res.data.warnings_count;
-  if (warnings) return { text: 'Warnings', tone: 'badge-moderate' };
-  return { text: 'Certified', tone: 'badge-success' };
-}
-
-function badgeForGenericAgent(res) {
-  return res.success ? { text: 'Complete', tone: 'badge-success' } : { text: 'Issue', tone: 'badge-alert' };
+  if (!res.success) return { text: 'Problem found', tone: 'badge-alert' };
+  return res.data && res.data.warnings_count ? { text: 'Warnings', tone: 'badge-moderate' } : { text: 'All good', tone: 'badge-success' };
 }
 
 function initAgentLoop() {
   const triggerBtn = document.getElementById('triggerAgentCheck');
   const slider = document.getElementById('alertThreshold');
-  const threshVal = document.getElementById('thresholdVal');
 
   slider.addEventListener('input', (e) => {
-    threshVal.textContent = `${e.target.value} (Borg RPE proxy threshold)`;
+    const v = parseFloat(e.target.value);
+    setText('thresholdVal', `${v.toFixed(1)} (${effortWord(v)})`);
     updateRpeVsThreshold();
   });
 
   triggerBtn.addEventListener('click', async () => {
-    if (!lastPayload) {
-      addCoachBubble({ icon: 'alert-triangle', name: 'Coach', text: 'No live data yet -- wait for the stream to connect before checking in.' });
-      return;
-    }
-
+    if (!lastPayload) return;
     const threshold = parseFloat(slider.value);
+    const effort = currentRpeEstimate(lastPayload).value;
     triggerBtn.disabled = true;
-    triggerBtn.textContent = 'Checking in...';
-    Object.keys(AGENT_BADGE_IDS).forEach((key) => setAgentBadge(key, 'Analyzing…', 'badge-neutral'));
-    const thinkingBubble = addCoachBubble({
-      icon: 'loader-circle',
-      name: 'AI Coach',
-      text: '<span class="thinking-dots"><span></span><span></span><span></span></span> Reviewing your live data...',
-      thinking: true,
-    });
+    triggerBtn.textContent = 'Checking...';
+    Object.keys(AGENT_BADGE_IDS).forEach((key) => setAgentBadge(key, 'Working...', 'badge-neutral'));
+    renderCoachThinking();
 
     try {
       const response = await fetch(`${API_BASE}/api/agents/analyze`, {
@@ -904,120 +794,110 @@ function initAgentLoop() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject_id: lastPayload.subject_id, step: lastPayload.step, threshold }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      const pipeline = result.agent_pipeline_results;
-      thinkingBubble.remove();
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.detail || `HTTP ${response.status}`);
+      }
+      const pipeline = (await response.json()).agent_pipeline_results;
 
       if (pipeline.decision_agent) {
-        const confidencePct = (lastPayload.prediction.confidence * 100).toFixed(1);
-        renderRecommendationCard(pipeline.decision_agent.data, confidencePct);
-        lastDecisionNarrative = pipeline.decision_agent.data.recommendation;
-        if (lastPayload) updateHero(lastPayload);
-        const info = PRIORITY_DISPLAY[pipeline.decision_agent.data.action_required];
-        setAgentBadge('decision_agent', info ? info.label : pipeline.decision_agent.data.action_required, info ? info.badgeTone : 'badge-neutral');
+        renderRecommendationCard(pipeline.decision_agent.data, effort);
+        updateHero(lastPayload);
+        const tone = pipeline.decision_agent.data.action_required === 'CONTINUE_MONITORING' ? 'badge-success'
+          : pipeline.decision_agent.data.action_required === 'REST_RECOMMENDED' ? 'badge-moderate' : 'badge-alert';
+        setAgentBadge('decision_agent', (PLAIN_ADVICE[pipeline.decision_agent.data.action_required] || {}).status || 'Done', tone);
       }
-
-      // Fetch grounded RAG explanation (Module 12.8)
-      const currentRpe = lastPayload?.prediction?.estimated_rpe_proxy || 15.0;
-      fetchRAGExplanation(lastPayload.subject_id, currentRpe, null);
       if (pipeline.data_agent) {
-        addCoachBubble({ icon: 'radio-tower', name: 'Signal Analyst', text: pipeline.data_agent.narrative });
+        addCoachBubble({ name: 'Signal check', text: pipeline.data_agent.narrative });
         const b = badgeForDataAgent(pipeline.data_agent);
         setAgentBadge('data_agent', b.text, b.tone);
       }
       if (pipeline.personalization_agent) {
-        addCoachBubble({ icon: 'dna', name: 'Personalization Coach', text: pipeline.personalization_agent.narrative });
-        const b = badgeForGenericAgent(pipeline.personalization_agent);
-        setAgentBadge('personalization_agent', b.text, b.tone);
+        addCoachBubble({ name: 'Personal adjustment', text: pipeline.personalization_agent.narrative });
+        setAgentBadge('personalization_agent', 'Done', 'badge-success');
       }
       if (pipeline.explainability_agent) {
-        addCoachBubble({ icon: 'lightbulb', name: 'Insight Translator', text: pipeline.explainability_agent.narrative });
-        const b = badgeForGenericAgent(pipeline.explainability_agent);
-        setAgentBadge('explainability_agent', b.text, b.tone);
+        addCoachBubble({ name: 'Explainer', text: pipeline.explainability_agent.narrative });
+        setAgentBadge('explainability_agent', 'Done', 'badge-success');
       }
       clearError();
     } catch (err) {
-      thinkingBubble.remove();
-      addCoachBubble({ icon: 'alert-triangle', name: 'Coach', text: `Backend unavailable -- the check-in could not run (${err.message}).` });
-      showError('AI Coach check-in failed: the FastAPI backend is unreachable. No simulated result was shown.');
+      document.getElementById('recommendationCardSlot').innerHTML =
+        `<div class="recommendation-card tone-alert margin-top"><p class="advice-text">The coach could not check in: ${err.message}.</p></div>`;
       Object.keys(AGENT_BADGE_IDS).forEach((key) => setAgentBadge(key, 'Unavailable', 'badge-alert'));
     } finally {
       triggerBtn.disabled = false;
-      triggerBtn.textContent = 'Check In With Coach';
+      triggerBtn.textContent = 'Check in';
     }
-    const activeSubject = lastPayload?.subject_id || selectedSubject || 'P01';
-    const activeRpe = lastPayload?.prediction?.estimated_rpe_proxy || 15.0;
-    renderLocalFallbackRAG(activeSubject, activeRpe);
   });
 
-  // Module 12.10: Ask-Your-Data Lookup Handler
+  // Ask a question (answers are grounded in the live window and cite their sources)
   const askBtn = document.getElementById('askDataBtn');
   const askInput = document.getElementById('askDataInput');
-  if (askBtn && askInput) {
-    askBtn.addEventListener('click', () => {
-      const query = askInput.value.trim();
-      if (!query) return;
-      const currentRpe = lastPayload?.prediction?.estimated_rpe_proxy || 15.0;
-      const subjectId = lastPayload?.subject_id || selectedSubject || 'P01';
-      addCoachBubble({ icon: 'help-circle', name: 'Ask-Your-Data', text: `Querying evidence for: "${query}"` });
-      fetchRAGExplanation(subjectId, currentRpe, query);
+  const ask = () => {
+    const query = askInput.value.trim();
+    if (query) fetchRAGExplanation(query);
+  };
+  askBtn.addEventListener('click', ask);
+  askInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+  document.querySelectorAll('[data-ask]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      askInput.value = chip.dataset.ask;
+      ask();
     });
-  }
+  });
 }
 
-// RAG Explanation Fetcher
-async function fetchRAGExplanation(subjectId, currentRpe, query) {
+// The server recomputes every number it cites from this exact window; on any
+// failure the box shows the real reason -- never a canned answer.
+// The backend answer names model features (slope_sign_changes) and internal tags
+// (CALIBRATED_TO_P01); show the everyday label instead, and escape the text first.
+function plainRagText(text) {
+  let out = String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\s*\(CALIBRATED_TO_[^)]*\)/g, '');
+  Object.keys(FEATURE_TRANSLATIONS).forEach((key) => {
+    out = out.replace(new RegExp(`\\b${key}\\b`, 'g'), FEATURE_TRANSLATIONS[key].label.toLowerCase());
+  });
+  return out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+}
+
+async function fetchRAGExplanation(query) {
   const contentBox = document.getElementById('ragExplainContent');
   const sourceTagsBox = document.getElementById('ragSourceTags');
-  if (!contentBox) return;
+  const showPanelError = (message) => {
+    contentBox.textContent = message;
+    sourceTagsBox.innerHTML = '';
+  };
+
+  if (!lastPayload) {
+    showPanelError("There's no live data yet. Wait for the athlete's view to start, then ask again.");
+    return;
+  }
+  contentBox.textContent = 'Looking that up...';
+  sourceTagsBox.innerHTML = '';
 
   try {
-    const res = await fetch('http://127.0.0.1:8000/api/rag/explain', {
+    const res = await fetch(`${API_BASE}/api/rag/explain`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subject_id: subjectId,
-        current_rpe: currentRpe,
-        user_query: query
-      })
+      body: JSON.stringify({ subject_id: lastPayload.subject_id, step: lastPayload.step, user_query: query }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      contentBox.innerHTML = `<div style="white-space: pre-wrap;">${data.explanation.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>`;
-      if (sourceTagsBox && data.retrieved_sources) {
-        sourceTagsBox.innerHTML = data.retrieved_sources.map(s => `<span class="badge" style="background: rgba(255,255,255,0.06); border: 1px solid #475569; padding: 2px 6px;">${s}</span>`).join(' ');
-      }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      showPanelError(`No answer available: ${body.detail || `HTTP ${res.status}`}`);
       return;
     }
+    const data = await res.json();
+    contentBox.innerHTML = plainRagText(data.explanation);
+    sourceTagsBox.innerHTML = (data.retrieved_sources || []).map((s) => `<span class="chip">${s}</span>`).join(' ');
   } catch (e) {
-    console.warn('RAG endpoint offline, using local fallback display.');
-  }
-  renderLocalFallbackRAG(subjectId, currentRpe, query);
-}
-
-function renderLocalFallbackRAG(subjectId, currentRpe, query) {
-  const contentBox = document.getElementById('ragExplainContent');
-  const sourceTagsBox = document.getElementById('ragSourceTags');
-  if (!contentBox) return;
-
-  contentBox.innerHTML = `
-    <strong>Fatigue Status:</strong> Borg RPE ${currentRpe.toFixed(1)} / 20.0.<br>
-    <strong>Grounded Findings:</strong> Anterior Deltoid Median Frequency spectral shift (-18.5% below baseline) confirms localized neuromuscular fatigue. Evaluated under WSD4FEDSRM shoulder protocol.<br>
-    <div style="margin-top: 8px; font-size: 0.75rem; color: #94a3b8; font-style: italic;">
-      *Notice: This system provides physiological fatigue assessment for research/ergonomics and does not provide clinical medical diagnosis.*
-    </div>
-  `;
-  if (sourceTagsBox) {
-    sourceTagsBox.innerHTML = `
-      <span class="badge" style="background: rgba(255,255,255,0.06); border: 1px solid #475569; padding: 2px 6px;">[PHYS-EMG-01: 'Surface EMG Spectral Compression' (De Luca 1997)]</span>
-      <span class="badge" style="background: rgba(255,255,255,0.06); border: 1px solid #475569; padding: 2px 6px;">[SCALE-BORG-01: 'Borg RPE Scale' (Borg 1982)]</span>
-    `;
+    showPanelError(`No answer available: the backend could not be reached (${e.message}).`);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Document Ready
+// Start-up
 // ---------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {

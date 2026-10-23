@@ -5,70 +5,42 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Athlete Intelligence — Understand. Predict. Perform.</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
-    <!-- Dashboard Stylesheet -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/style.css">
-    <!-- Chart.js + Lucide icon pack (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   </head>
   <body>
-    <!-- Shared gradient defs for HUD rings -->
     <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
       <defs>
         <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#2ee6ff" />
-          <stop offset="55%" stop-color="#4f8dff" />
-          <stop offset="100%" stop-color="#a855f7" />
+          <stop offset="100%" stop-color="#5b8fee" />
         </linearGradient>
       </defs>
     </svg>
 
     <div id="app">
-      <!-- Sidebar Navigation Rail -->
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
           <div class="brand-text">
             <h2>Athlete Intelligence</h2>
-            <span>Understand · Predict · Perform</span>
+            <span>Understand. Predict. Perform.</span>
           </div>
         </div>
 
         <nav class="nav-menu" aria-label="Dashboard sections">
           <div class="nav-slide-indicator" id="navSlideIndicator" aria-hidden="true"></div>
-          <button class="nav-item active" data-tab="signals">
-            <i data-lucide="activity"></i>
-            <span>Live Performance</span>
-            <span class="nav-step-index">01</span>
-          </button>
-          <button class="nav-item" data-tab="predictions">
-            <i data-lucide="gauge"></i>
-            <span>Performance Score</span>
-            <span class="nav-step-index">02</span>
-          </button>
-          <button class="nav-item" data-tab="explainability">
-            <i data-lucide="brain-circuit"></i>
-            <span>AI Insights</span>
-            <span class="nav-step-index">03</span>
-          </button>
-          <button class="nav-item" data-tab="personalization">
-            <i data-lucide="user-round"></i>
-            <span>Athlete Profile</span>
-            <span class="nav-step-index">04</span>
-          </button>
-          <button class="nav-item" data-tab="agents">
-            <i data-lucide="cpu"></i>
-            <span>AI Coach</span>
-            <span class="nav-step-index">05</span>
-          </button>
+          <button class="nav-item active" data-tab="signals"><i data-lucide="activity"></i><span>Right Now</span></button>
+          <button class="nav-item" data-tab="predictions"><i data-lucide="gauge"></i><span>How Tired?</span></button>
+          <button class="nav-item" data-tab="explainability"><i data-lucide="lightbulb"></i><span>Why?</span></button>
+          <button class="nav-item" data-tab="personalization"><i data-lucide="user-round"></i><span>About You</span></button>
+          <button class="nav-item" data-tab="agents"><i data-lucide="message-circle"></i><span>Coach</span></button>
         </nav>
 
         <div class="sidebar-footer">
@@ -80,551 +52,260 @@
           </div>
           <div class="status-indicator" id="connectionStatus" role="status">
             <span class="pulse-dot"></span>
-            <span class="status-text" id="connectionStatusText">Connecting to backend...</span>
+            <span class="status-text" id="connectionStatusText">Connecting...</span>
           </div>
         </div>
       </aside>
 
-      <!-- Main Content Area -->
       <main class="main-content">
-        <!-- Top Banner Header -->
         <header class="top-header">
           <div class="header-title">
-            <h1 id="pageTitle">Live Performance</h1>
-            <p id="pageSubtitle">Real muscle, movement, and heart-response signals, streamed live from your last session</p>
+            <h1 id="pageTitle">Right Now</h1>
+            <p id="pageSubtitle">What is happening in the athlete's body at this moment.</p>
           </div>
           <div class="header-actions">
-            <div class="badge badge-success">Real Session Replay</div>
-            <div class="badge badge-purple">AI Model + Explainability</div>
-            <div class="badge badge-moderate" id="pausedBadge" style="display: none;">Stream Paused</div>
+            <div class="badge badge-moderate" id="pausedBadge" style="display: none;">Paused</div>
             <button class="btn btn-outline" id="themeToggle" aria-label="Switch between dark and light mode" title="Switch theme">
               <span id="themeToggleIconWrap"><i data-lucide="moon" style="width: 14px; height: 14px;"></i></span>
               <span id="themeToggleText">Dark</span>
             </button>
-            <button class="btn btn-outline" id="togglePlayback" aria-label="Pause or resume the live signal stream">
+            <button class="btn btn-outline" id="togglePlayback" aria-label="Pause or resume the live view">
               <span id="playbackIconWrap"><i data-lucide="pause" style="width: 14px; height: 14px;"></i></span>
-              <span id="playbackBtnText">Pause Stream</span>
+              <span id="playbackBtnText">Pause</span>
             </button>
           </div>
         </header>
 
         <div class="error-banner" id="errorBanner" style="display: none;" role="alert"></div>
 
-        <!-- Persistent Hero -- cinematic status readout, updates live from the same replay window as every tab below -->
-        <section class="hero" id="heroSection" aria-label="Today's performance summary">
-          <div class="hero-top">
-            <span class="hero-eyebrow">Today's Performance</span>
-            <span class="hero-athlete">Athlete <strong id="heroAthleteId">--</strong></span>
+        <!-- Always-visible summary: how hard is the athlete working, and what to do about it -->
+        <section class="hero" aria-label="Summary">
+          <div class="hero-ring">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 120 120" width="120" height="120">
+                <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+                <circle class="ring-progress" id="heroRingProgress" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-value" id="heroScoreValue">--</span>
+                <span class="ring-unit">out of 20</span>
+              </div>
+            </div>
           </div>
           <div class="hero-main">
-            <div class="hero-score">
-              <div class="ring-wrap" style="width: 128px; height: 128px;">
-                <svg viewBox="0 0 120 120" width="128" height="128">
-                  <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                  <circle class="ring-progress" id="heroRingProgress" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
-                </svg>
-                <div class="ring-center">
-                  <span class="ring-value" id="heroScoreValue">--</span>
-                  <span class="ring-unit">Score</span>
-                </div>
-              </div>
-              <span class="hero-score-label">Performance</span>
-            </div>
-            <div class="hero-block">
-              <span class="hs-label">Fatigue Status</span>
-              <div class="hs-value"><span class="status-pill tone-good" id="heroStatusPill">--</span></div>
-              <div class="hs-sub" id="heroFatigueSub">--</div>
-            </div>
-            <div class="hero-block">
-              <span class="hs-label">AI Recommendation</span>
-              <div class="hs-value" id="heroRecommendation" style="font-size: 0.9rem; font-weight: 500;">Check in with your AI Coach for a live recommendation.</div>
-              <div class="hs-sub" id="heroRecommendationSub">Not yet assessed this session</div>
-            </div>
+            <span class="hero-eyebrow">Athlete <strong id="heroAthleteId">--</strong><span id="heroActivity"></span></span>
+            <div class="hero-status"><span class="status-pill tone-good" id="heroStatusPill">--</span></div>
+            <p class="hero-sub" id="heroEffortSub">Waiting for the live view to start...</p>
+          </div>
+          <div class="hero-advice">
+            <span class="hero-eyebrow">Coach says</span>
+            <p class="hero-advice-text" id="heroRecommendation">Open the Coach tab and tap "Check in" for advice.</p>
+            <small id="heroRecommendationSub"></small>
           </div>
         </section>
 
-        <!-- Dynamic View Containers -->
         <div class="content-body">
 
-          <!-- TAB 1: LIVE PERFORMANCE -->
+          <!-- TAB 1: RIGHT NOW -->
           <section id="tab-signals" class="tab-content active">
-            <div class="section-lede">
-              <h2>Live Performance</h2>
-              <p>Real muscle (EMG), movement (IMU), and heart-response (PPG) signals — replayed progressively from your recorded session, exactly as they were captured.</p>
-            </div>
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <div class="metric-header">
-                  <div class="metric-icon"><i data-lucide="activity"></i></div>
-                  <span class="metric-badge">Shoulder · live</span>
-                </div>
-                <span class="metric-label">Muscle Activity</span>
-                <div class="metric-value" id="emgRmsVal">-- <span class="unit"></span></div>
-                <div class="metric-trend">Real signal, current moment</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-header">
-                  <div class="metric-icon"><i data-lucide="move-3d"></i></div>
-                  <span class="metric-badge">Upper arm · live</span>
-                </div>
-                <span class="metric-label">Movement Quality</span>
-                <div class="metric-value" id="imuJerkVal">-- <span class="unit"></span></div>
-                <div class="metric-trend">Average across this moment</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-header">
-                  <div class="metric-icon"><i data-lucide="heart-pulse"></i></div>
-                  <span class="metric-badge">Pulse · live</span>
-                </div>
-                <span class="metric-label">Heart Response</span>
-                <div class="metric-value" id="ppgHrVal">-- <span class="unit"></span></div>
-                <div class="metric-trend">Average across this moment</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-header">
-                  <div class="metric-icon"><i data-lucide="target"></i></div>
-                  <span class="metric-badge" id="conditionBadge">--</span>
-                </div>
-                <span class="metric-label">Current Activity</span>
-                <div class="metric-value" style="font-size: 1.25rem; color: var(--neon-cyan);" id="conditionDirection">--</div>
-                <div class="metric-trend" id="conditionIdText">--</div>
+            <div class="plain-card activity-card">
+              <i data-lucide="dumbbell"></i>
+              <div>
+                <div class="plain-label">Doing right now</div>
+                <div class="plain-value" id="activityText">--</div>
               </div>
             </div>
 
-            <div class="charts-grid-2x2">
-              <div class="chart-card span-2">
-                <div class="chart-header">
-                  <div>
-                    <h3>Muscle Activity — 3 Shoulder Muscles</h3>
-                    <p class="chart-sub">Real, filtered muscle signal replayed live</p>
-                  </div>
-                  <div class="channel-pills">
-                    <span class="pill active">Ant. Deltoid</span>
-                    <span class="pill active">Infraspinatus</span>
-                    <span class="pill active">Lat. Dorsi</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="emgChart"></canvas>
-                </div>
-                <details class="tech-details">
-                  <summary>Technical details</summary>
-                  <div class="tech-details-body">Raw surface EMG (sEMG), Butterworth bandpass 20–450 Hz with notch filtering. Sampled at 1000 Hz.</div>
-                </details>
+            <div class="tile-grid">
+              <div class="tile">
+                <div class="plain-label">Muscle effort</div>
+                <div class="tile-value" id="tileEffortValue">--</div>
+                <div class="tile-sub">Compared with this athlete's usual</div>
               </div>
-
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div>
-                    <h3>Movement Quality</h3>
-                    <p class="chart-sub">Tri-axial motion during the exercise</p>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="imuChart"></canvas>
-                </div>
-                <details class="tech-details">
-                  <summary>Technical details</summary>
-                  <div class="tech-details-body">Upper-arm IMU accelerometer, 3 axes, 100 Hz.</div>
-                </details>
+              <div class="tile">
+                <div class="plain-label">Muscle tiredness sign</div>
+                <div class="tile-value" id="tileFatigueValue">--</div>
+                <div class="tile-sub">Muscles give off a slower signal when they tire</div>
               </div>
-
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div>
-                    <h3>Heart Response</h3>
-                    <p class="chart-sub">Blood volume pulse waveform</p>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="ppgChart"></canvas>
-                </div>
-                <details class="tech-details">
-                  <summary>Technical details</summary>
-                  <div class="tech-details-body">Infrared PPG (BVP), 200 Hz finger sensor.</div>
-                </details>
+              <div class="tile">
+                <div class="plain-label">Athlete says</div>
+                <div class="tile-value" id="tileReportedValue">--</div>
+                <div class="tile-sub">Their own effort rating, closest in time</div>
               </div>
             </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3>Muscle effort over the last minute</h3>
+                  <p class="chart-sub">A higher line means the muscle is working harder.</p>
+                </div>
+              </div>
+              <div class="chart-container" style="height: 230px;">
+                <canvas id="effortTrendChart"></canvas>
+              </div>
+            </div>
+
+            <details class="tech-details" id="rawSignalsDetails">
+              <summary>Technical details: raw sensor signals</summary>
+              <div class="tech-details-body">
+                <p class="chart-sub">What the sensors record: muscle electrical activity (3 muscles, in millivolts), arm movement (3 directions) and pulse.</p>
+                <div class="chart-container" style="height: 220px;"><canvas id="emgChart"></canvas></div>
+                <div class="chart-container" style="height: 220px;"><canvas id="imuChart"></canvas></div>
+                <div class="chart-container" style="height: 220px;"><canvas id="ppgChart"></canvas></div>
+              </div>
+            </details>
           </section>
 
-          <!-- TAB 2: PERFORMANCE SCORE -->
+          <!-- TAB 2: HOW TIRED? -->
           <section id="tab-predictions" class="tab-content">
-            <div class="section-lede">
-              <h2>Performance Score</h2>
-              <p>A live, human-friendly read on how your body is handling this session — powered by the trained AI model underneath.</p>
-            </div>
-            <div class="split-view">
-              <div class="card gauge-card">
-                <h3>Performance Score</h3>
-                <p class="chart-sub">Higher is better · updates every moment</p>
+            <div class="card">
+              <h3 class="card-title">How hard is the athlete working?</h3>
+              <p class="plain-lede" id="effortHeadline">--</p>
 
-                <div class="gauge-container">
-                  <div class="big-ring-wrap">
-                    <svg viewBox="0 0 120 120" width="210" height="210">
-                      <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                      <circle class="ring-progress" id="scoreRingProgress" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
-                    </svg>
-                    <div class="gauge-value-display">
-                      <span class="rpe-number" id="currentProbability">--</span>
-                      <span class="rpe-scale">/ 100</span>
-                    </div>
-                  </div>
-                  <div class="rpe-status-label" id="predictedLabelBadge">Waiting for stream...</div>
+              <div class="effort-meter" aria-hidden="true">
+                <div class="effort-meter-bar">
+                  <span class="seg seg-1"></span><span class="seg seg-2"></span><span class="seg seg-3"></span><span class="seg seg-4"></span>
+                  <span class="marker marker-estimate" id="meterEstimate"><em>Estimate</em></span>
+                  <span class="marker marker-reported" id="meterReported" style="display: none;"><em>Athlete said</em></span>
                 </div>
-
-                <div class="fingerprint-summary">
-                  <div class="fp-row">
-                    <span>Fatigue Risk:</span>
-                    <strong id="fatigueRiskText">--</strong>
-                  </div>
-                  <div class="fp-row">
-                    <span>AI Confidence:</span>
-                    <strong id="confidenceText">--</strong>
-                  </div>
-                  <div class="fp-row">
-                    <span>Estimated Borg RPE:</span>
-                    <strong id="estimatedRpeText" title="Derived from the AI model's own fatigue-risk output, not a separate regression model">--</strong>
-                  </div>
-                  <div class="fp-row">
-                    <span>Recorded Borg RPE (self-report):</span>
-                    <strong id="groundTruthRpeText">--</strong>
-                  </div>
-                  <div class="fp-row">
-                    <span>Current activity:</span>
-                    <strong id="currentTaskText">--</strong>
-                  </div>
-                  <div class="fp-row">
-                    <span>Predicted class:</span>
-                    <strong id="predictedClassText">--</strong>
-                  </div>
-                </div>
+                <div class="effort-meter-scale"><span>Light</span><span>Somewhat hard</span><span>Hard</span><span>Very hard</span><span>Maximal</span></div>
               </div>
 
-              <div class="card flex-1">
-                <div class="chart-header">
-                  <div>
-                    <h3>Performance Trend</h3>
-                    <p class="chart-sub">Your performance score across the session, alongside recorded Borg RPE where available</p>
-                  </div>
-                </div>
-                <div class="chart-container" style="height: 340px;">
-                  <canvas id="fatigueProgressionChart"></canvas>
-                </div>
+              <div class="fact-list">
+                <div class="fact-row"><span>Estimated effort</span><strong id="estimatedRpeText">--</strong></div>
+                <div class="fact-row"><span>Athlete's own rating</span><strong id="groundTruthRpeText">--</strong></div>
+                <div class="fact-row"><span>Chance of a fatigued state</span><strong id="fatigueRiskText">--</strong></div>
               </div>
+              <p class="note" id="estimatedRpeSource">--</p>
             </div>
 
             <div class="chart-card margin-top">
               <div class="chart-header">
                 <div>
-                  <h3>What the AI Is Measuring Right Now</h3>
-                  <p class="chart-sub">The real signal features feeding this moment's prediction</p>
+                  <h3>Effort over time</h3>
+                  <p class="chart-sub">The estimate compared with what the athlete reported. Scale: 6 = no effort, 20 = maximal.</p>
                 </div>
               </div>
-              <div class="chart-container" style="height: 260px;">
-                <canvas id="muscleSpectralChart"></canvas>
+              <div class="chart-container" style="height: 280px;">
+                <canvas id="fatigueProgressionChart"></canvas>
               </div>
             </div>
           </section>
 
-          <!-- TAB 3: AI INSIGHTS -->
+          <!-- TAB 3: WHY? -->
           <section id="tab-explainability" class="tab-content">
-            <div class="section-lede">
-              <h2>AI Insights</h2>
-              <p>Why did the AI reach this conclusion? Here's what mattered most for this moment's score.</p>
-            </div>
-
             <div class="card">
-              <div class="insight-row">
-                <div class="insight-rank">1</div>
-                <div class="insight-text">
-                  <div class="insight-title" id="shapTopFeature1">--</div>
-                  <div class="insight-desc" id="shapTopFeature1Desc">Waiting for live data...</div>
-                </div>
-                <div class="insight-bar-wrap">
-                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature1Bar"></div></div>
-                  <span class="insight-impact" id="shapTopFeature1Val">--</span>
-                </div>
-              </div>
-              <div class="insight-row">
-                <div class="insight-rank">2</div>
-                <div class="insight-text">
-                  <div class="insight-title" id="shapTopFeature2">--</div>
-                  <div class="insight-desc" id="shapTopFeature2Desc">Waiting for live data...</div>
-                </div>
-                <div class="insight-bar-wrap">
-                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature2Bar"></div></div>
-                  <span class="insight-impact" id="shapTopFeature2Val">--</span>
-                </div>
-              </div>
-              <div class="insight-row">
-                <div class="insight-rank">3</div>
-                <div class="insight-text">
-                  <div class="insight-title" id="shapTopFeature3">--</div>
-                  <div class="insight-desc" id="shapTopFeature3Desc">Waiting for live data...</div>
-                </div>
-                <div class="insight-bar-wrap">
-                  <div class="insight-bar-track"><div class="insight-bar-fill" id="shapTopFeature3Bar"></div></div>
-                  <span class="insight-impact" id="shapTopFeature3Val">--</span>
-                </div>
-              </div>
+              <h3 class="card-title">What is driving this reading?</h3>
+              <p class="plain-lede">The three biggest reasons behind the current reading, from the athlete's muscle signal.</p>
 
-              <details class="tech-details">
-                <summary>Advanced technical details (SHAP values)</summary>
-                <div class="tech-details-body" id="shapTechDetails">--</div>
-              </details>
-            </div>
-
-            <div class="metrics-grid margin-top">
-              <div class="metric-card">
-                <div class="metric-header">
-                  <div class="metric-icon"><i data-lucide="sparkles"></i></div>
-                </div>
-                <span class="metric-label">AI Confidence</span>
-                <div class="metric-value" style="font-size: 1.5rem; color: var(--neon-cyan);" id="shapConfidence">--</div>
-                <div class="metric-trend">How sure the model is about this prediction</div>
+              <div class="reason-row">
+                <div class="reason-rank">1</div>
+                <div class="reason-text"><div class="reason-title" id="shapTopFeature1">--</div><div class="reason-desc" id="shapTopFeature1Desc">Waiting for live data...</div></div>
+                <span class="chip" id="shapTopFeature1Val">--</span>
+              </div>
+              <div class="reason-row">
+                <div class="reason-rank">2</div>
+                <div class="reason-text"><div class="reason-title" id="shapTopFeature2">--</div><div class="reason-desc" id="shapTopFeature2Desc">Waiting for live data...</div></div>
+                <span class="chip" id="shapTopFeature2Val">--</span>
+              </div>
+              <div class="reason-row">
+                <div class="reason-rank">3</div>
+                <div class="reason-text"><div class="reason-title" id="shapTopFeature3">--</div><div class="reason-desc" id="shapTopFeature3Desc">Waiting for live data...</div></div>
+                <span class="chip" id="shapTopFeature3Val">--</span>
               </div>
             </div>
 
-            <div class="split-view margin-top">
-              <div class="chart-card flex-1">
-                <div class="chart-header">
-                  <div>
-                    <h3>What Matters Most, Overall</h3>
-                    <p class="chart-sub">This athlete's biggest fatigue drivers across their whole session</p>
-                  </div>
-                </div>
-                <div class="chart-container" style="height: 360px;">
-                  <canvas id="shapBarChart"></canvas>
-                </div>
+            <details class="tech-details">
+              <summary>Technical details: model values</summary>
+              <div class="tech-details-body">
+                <p class="chart-sub">Contribution of each signal feature to this window's prediction (SHAP values).</p>
+                <pre class="tech-pre" id="shapTechDetails">--</pre>
+                <p class="chart-sub">Most influential features across this athlete's whole session:</p>
+                <pre class="tech-pre" id="shapGlobalDetails">--</pre>
               </div>
-
-              <div class="chart-card flex-1">
-                <div class="chart-header">
-                  <div>
-                    <h3>Why This Moment's Score</h3>
-                    <p class="chart-sub">What's pushing the score up or down, right now</p>
-                  </div>
-                </div>
-                <div class="chart-container" style="height: 360px;">
-                  <canvas id="shapWaterfallChart"></canvas>
-                </div>
-              </div>
-            </div>
+            </details>
           </section>
 
-          <!-- TAB 4: ATHLETE PROFILE (Player Card) -->
+          <!-- TAB 4: ABOUT YOU -->
           <section id="tab-personalization" class="tab-content">
-            <div class="section-lede">
-              <h2>Athlete Profile</h2>
-              <p>Real demographic, strength, and baseline data — this is what personalizes every prediction to this athlete.</p>
-            </div>
-
-            <div class="player-card">
-              <div class="player-card-grid">
-                <div class="player-power-ring">
-                  <svg viewBox="0 0 120 120" width="148" height="148" style="transform: rotate(-90deg); overflow: visible;">
-                    <circle class="ring-track" cx="60" cy="60" r="52"></circle>
-                    <circle class="ring-progress" id="playerPowerRing" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
-                  </svg>
-                  <div class="player-power-center">
-                    <span class="ppc-value" id="playerPowerValue">--</span>
-                    <span class="ppc-label">Power Level</span>
-                  </div>
-                </div>
-                <div class="player-id">
-                  <h3 id="playerCardName">Athlete --</h3>
-                  <div class="player-tag" id="playerCardTag">Calibrating…</div>
-                  <div class="player-meta">
-                    <span>Dominant Arm: <strong id="playerMetaArm">--</strong></span>
-                    <span>Profile: <strong id="playerMetaDemo">--</strong></span>
-                    <span>Strength (MVIC): <strong id="playerMetaStrength">--</strong></span>
-                  </div>
-                </div>
-                <div class="player-radar-wrap">
-                  <canvas id="skillRadarChart"></canvas>
-                </div>
-              </div>
-            </div>
-
-            <div class="profile-cards-row">
-              <div class="profile-stat-card">
-                <div class="psc-icon tone-cyan"><i data-lucide="dumbbell"></i></div>
-                <div class="psc-label">Strength (MVIC)</div>
-                <div class="psc-value" id="profileCardStrength">--</div>
-                <div class="psc-sub">Internal / external rotation baseline</div>
-              </div>
-              <div class="profile-stat-card">
-                <div class="psc-icon tone-blue"><i data-lucide="hand"></i></div>
-                <div class="psc-label">Dominant Arm</div>
-                <div class="psc-value" id="profileCardArm">--</div>
-                <div class="psc-sub">Used to interpret asymmetry</div>
-              </div>
-              <div class="profile-stat-card">
-                <div class="psc-icon tone-purple"><i data-lucide="scale"></i></div>
-                <div class="psc-label">Body Composition</div>
-                <div class="psc-value" id="profileCardBody">--</div>
-                <div class="psc-sub">BMI / body fat</div>
-              </div>
-              <div class="profile-stat-card">
-                <div class="psc-icon tone-cyan"><i data-lucide="user-round"></i></div>
-                <div class="psc-label">Demographics</div>
-                <div class="psc-value" id="profileCardDemo">--</div>
-                <div class="psc-sub">Sex / age</div>
-              </div>
-            </div>
-
             <div class="card">
-              <details class="tech-details" open>
-                <summary>Full profile data</summary>
-                <div class="profile-grid">
-                  <div class="profile-item">
-                    <span class="p-label">Sex / Age</span>
-                    <span class="p-val" id="profileSexAge">--</span>
-                  </div>
-                  <div class="profile-item">
-                    <span class="p-label">Height / Mass</span>
-                    <span class="p-val" id="profileHeightMass">--</span>
-                  </div>
-                  <div class="profile-item">
-                    <span class="p-label">Dominant Hand</span>
-                    <span class="p-val" id="profileHand">--</span>
-                  </div>
-                  <div class="profile-item">
-                    <span class="p-label">BMI / Body Fat</span>
-                    <span class="p-val" id="profileBmiFat">--</span>
-                  </div>
-                  <div class="profile-item">
-                    <span class="p-label">MVIC Baseline (Internal Rotation)</span>
-                    <span class="p-val" id="profileMvicIr">--</span>
-                  </div>
-                  <div class="profile-item">
-                    <span class="p-label">MVIC Baseline (External Rotation)</span>
-                    <span class="p-val" id="profileMvicEr">--</span>
-                  </div>
-                </div>
-              </details>
-            </div>
-
-            <!-- Subject id used for the player-card header + section title -->
-            <span id="profileSubjectId" style="display: none;">--</span>
-
-            <div class="chart-card margin-top">
-              <div class="chart-header">
-                <div>
-                  <h3>Your Score vs. Population Average</h3>
-                  <p class="chart-sub">Generic population model vs. this athlete's own baseline-adjusted score</p>
-                </div>
-              </div>
-              <div class="chart-container" style="height: 320px;">
-                <canvas id="losoComparisonChart"></canvas>
-              </div>
-            </div>
-          </section>
-
-          <!-- TAB 5: AI COACH (AI Terminal) -->
-          <section id="tab-agents" class="tab-content">
-            <div class="section-lede">
-              <h2>AI Coach</h2>
-              <p>Your real-time coaching assistant — powered by the live agent backend, not a script.</p>
-            </div>
-            <div class="card coach-shell">
-              <div class="chart-header">
-                <div>
-                  <h3>AI Coach</h3>
-                  <p class="chart-sub">Ask for a check-in any time during your session</p>
-                </div>
-                <div class="badge badge-success">Coach Online</div>
-              </div>
-
-              <div class="coach-controls">
-                <div>
-                  <div class="control-box">
-                    <label for="alertThreshold">Coach Alert Sensitivity</label>
-                    <input type="range" id="alertThreshold" min="12" max="18" value="15" step="0.5" aria-label="Coach alert sensitivity, Borg RPE threshold">
-                    <span id="thresholdVal">15.0 (Hard Exertion)</span>
-                  </div>
-                  <div class="control-sub" id="currentRpeVsThreshold">Waiting for live data...</div>
-                </div>
-                <button class="btn btn-primary" id="triggerAgentCheck" disabled>Check In With Coach</button>
-
-                <!-- MODULE 12.8: RAG EXPLAIN PANEL -->
-                <div class="card margin-top" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(0, 240, 255, 0.2);">
-                  <div class="chart-header">
-                    <div>
-                      <h4 style="color: var(--color-cyan); margin: 0; display: flex; align-items: center; gap: 8px;">
-                        <span>📚 Evidence-Grounded RAG Explanation</span>
-                        <span class="badge" style="background: rgba(0, 240, 255, 0.15); color: var(--color-cyan); font-size: 0.75rem; border: 1px solid var(--color-cyan);">[Generated Text]</span>
-                      </h4>
-                      <p class="chart-sub" style="margin: 4px 0 0 0;">Numbers verified against pipeline SessionSummary by regex guardrail (Module 10.3)</p>
-                    </div>
-                  </div>
-                  <div id="ragExplainContent" style="padding: 12px; font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; background: rgba(0,0,0,0.2); border-radius: 6px; margin-top: 10px;">
-                    <p style="margin: 0;"><em>Click 'Check In With Coach' or select an Ask-Your-Data query below to generate a grounded explanation...</em></p>
-                  </div>
-                  <div id="ragSourceTags" style="margin-top: 8px; font-size: 0.75rem; color: #94a3b8; display: flex; flex-wrap: wrap; gap: 6px;"></div>
-                </div>
-
-                <!-- MODULE 12.10: ASK-YOUR-DATA BOX -->
-                <div class="card margin-top" style="background: rgba(15, 23, 42, 0.5);">
-                  <div class="chart-header">
-                    <h4 style="margin: 0; font-size: 0.95rem; color: #f1f5f9;">💬 Ask-Your-Data (Read-Only Lookups)</h4>
-                  </div>
-                  <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <input type="text" id="askDataInput" placeholder="e.g. Why did fatigue increase? What is the MDF drop?" style="flex: 1; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #f8fafc; font-size: 0.85rem;">
-                    <button class="btn btn-primary" id="askDataBtn" style="padding: 8px 16px;">Ask</button>
-                  </div>
-                  <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
-                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'Why did muscle fatigue rise?'; document.getElementById('askDataBtn').click();">"Why did fatigue rise?"</button>
-                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'What does the EMG frequency drop signify?'; document.getElementById('askDataBtn').click();">"What does EMG drop mean?"</button>
-                    <button class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid #334155;" onclick="document.getElementById('askDataInput').value = 'How does Subject P03 arm length alter the baseline?'; document.getElementById('askDataBtn').click();">"Subject P03 baseline"</button>
-                  </div>
-                </div>
-              </div>
-
-              <div id="recommendationCardSlot"></div>
-
-              <div class="coach-feed" id="agentLogs" aria-live="polite">
-                <div class="coach-placeholder">Select an athlete and click "Check In With Coach" to get a live assessment.</div>
+              <h3 class="card-title">About <span id="profileSubjectId">--</span></h3>
+              <p class="plain-lede">The details we use to compare this athlete with their own usual signals.</p>
+              <div class="fact-list">
+                <div class="fact-row"><span>Age and sex</span><strong id="profileCardDemo">--</strong></div>
+                <div class="fact-row"><span>Height and weight</span><strong id="profileHeightMass">--</strong></div>
+                <div class="fact-row"><span>Stronger hand</span><strong id="profileCardArm">--</strong></div>
+                <div class="fact-row"><span>Shoulder strength (rotating in / out)</span><strong id="profileCardStrength">--</strong></div>
               </div>
             </div>
 
             <div class="card margin-top">
-              <h3>Meet Your AI Team</h3>
-              <div class="agent-status-strip" style="margin-top: 1rem;">
-                  <div class="agent-status-card">
-                    <div class="asc-icon"><i data-lucide="radio-tower"></i></div>
-                    <div>
-                      <div class="agent-name">Signal Analyst</div>
-                      <p class="agent-role">Checks your live muscle, movement, and heart-response data for quality issues.</p>
-                      <span class="badge badge-success" id="dataAgentBadge">Ready</span>
-                    </div>
-                  </div>
-                  <div class="agent-status-card">
-                    <div class="asc-icon"><i data-lucide="dna"></i></div>
-                    <div>
-                      <div class="agent-name">Personalization Coach</div>
-                      <p class="agent-role">Adjusts every score to your own strength baseline and body profile.</p>
-                      <span class="badge badge-success" id="personalizationAgentBadge">Ready</span>
-                    </div>
-                  </div>
-                  <div class="agent-status-card">
-                    <div class="asc-icon"><i data-lucide="lightbulb"></i></div>
-                    <div>
-                      <div class="agent-name">Insight Translator</div>
-                      <p class="agent-role">Turns the AI model's math into a plain-language explanation.</p>
-                      <span class="badge badge-success" id="explainabilityAgentBadge">Ready</span>
-                    </div>
-                  </div>
-                  <div class="agent-status-card">
-                    <div class="asc-icon"><i data-lucide="brain-circuit"></i></div>
-                    <div>
-                      <div class="agent-name">Head Coach</div>
-                      <p class="agent-role">Weighs the safety threshold and delivers your final recommendation.</p>
-                      <span class="badge badge-success" id="decisionAgentBadge">Ready</span>
-                    </div>
-                  </div>
-                </div>
+              <h3 class="card-title">Earlier sessions</h3>
+              <p class="plain-lede" id="historyText">--</p>
             </div>
+
+            <div class="card margin-top">
+              <h3 class="card-title">Adjusted for this athlete</h3>
+              <p class="plain-lede">The chance of a fatigued state, first for an average athlete, then adjusted for this athlete's own usual signals.</p>
+              <div class="compare-row">
+                <div class="compare-item"><div class="compare-number" id="genericRiskText">--</div><div class="plain-label">Average athlete</div></div>
+                <i data-lucide="arrow-right"></i>
+                <div class="compare-item"><div class="compare-number" id="personalRiskText">--</div><div class="plain-label">This athlete</div></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TAB 5: COACH -->
+          <section id="tab-agents" class="tab-content">
+            <div class="card coach-shell">
+              <h3 class="card-title">Ask the coach for advice</h3>
+              <p class="plain-lede">The coach looks at the athlete's current moment and tells you what to do next.</p>
+
+              <div class="coach-controls">
+                <div>
+                  <div class="control-box">
+                    <label for="alertThreshold">Warn me when effort reaches</label>
+                    <input type="range" id="alertThreshold" min="12" max="18" value="15" step="0.5" aria-label="Effort level at which the coach should warn">
+                    <span id="thresholdVal">15.0 (Hard)</span>
+                  </div>
+                  <div class="control-sub" id="currentRpeVsThreshold">Waiting for live data...</div>
+                </div>
+                <button class="btn btn-primary" id="triggerAgentCheck" disabled>Check in</button>
+              </div>
+
+              <div id="recommendationCardSlot"></div>
+            </div>
+
+            <div class="card margin-top">
+              <h3 class="card-title">Ask a question</h3>
+              <p class="plain-lede">Ask about the current reading. The answer cites the sources it used.</p>
+              <div class="ask-row">
+                <input type="text" id="askDataInput" class="text-input" placeholder="For example: Why is the effort rising?">
+                <button class="btn btn-primary" id="askDataBtn">Ask</button>
+              </div>
+              <div class="ask-examples">
+                <button class="chip chip-button" data-ask="Why is the effort rising?">Why is the effort rising?</button>
+                <button class="chip chip-button" data-ask="What does a muscle tiredness sign mean?">What does a tiredness sign mean?</button>
+              </div>
+              <div class="answer-box" id="ragExplainContent">Your answer appears here.</div>
+              <div class="source-tags" id="ragSourceTags"></div>
+            </div>
+
+            <details class="tech-details">
+              <summary>Technical details: how the coach reached this</summary>
+              <div class="tech-details-body">
+                <div class="agent-status-strip" style="margin-bottom: 1rem;">
+                  <div class="agent-status-card"><div><div class="agent-name">Signal check</div><p class="agent-role">Looks for missing or broken sensor data.</p><span class="badge badge-success" id="dataAgentBadge">Ready</span></div></div>
+                  <div class="agent-status-card"><div><div class="agent-name">Personal adjustment</div><p class="agent-role">Adjusts for this athlete's strength.</p><span class="badge badge-success" id="personalizationAgentBadge">Ready</span></div></div>
+                  <div class="agent-status-card"><div><div class="agent-name">Explainer</div><p class="agent-role">Lists what influenced the reading.</p><span class="badge badge-success" id="explainabilityAgentBadge">Ready</span></div></div>
+                  <div class="agent-status-card"><div><div class="agent-name">Final decision</div><p class="agent-role">Applies the safety rules and gives the advice.</p><span class="badge badge-success" id="decisionAgentBadge">Ready</span></div></div>
+                </div>
+                <div class="coach-feed" id="agentLogs" aria-live="polite">
+                  <div class="coach-placeholder">Tap "Check in" to see each step.</div>
+                </div>
+              </div>
+            </details>
           </section>
 
         </div>
