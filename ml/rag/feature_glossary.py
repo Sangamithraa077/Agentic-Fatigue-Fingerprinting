@@ -33,12 +33,39 @@ _TAG_PATTERNS = (
 )
 
 
+_MUSCLE_WORDS = {
+    "anterior_deltoid": "front shoulder", "posterior_deltoid": "rear shoulder", "infraspinatus": "rotator cuff",
+    "upper_trapezius": "upper trapezius", "latissimus_dorsi": "latissimus", "pectoralis_major": "chest",
+}
+_SITE_WORDS = {"forearm": "forearm", "hand": "hand", "upper_arm": "upper arm", "shoulder": "shoulder", "sternum": "trunk"}
+_EMG_KIND = {"rms": "muscle activity", "mdf": "muscle fibre tiredness", "mnf": "muscle signal speed"}
+_IMU_KIND = {"gyr_mean": "movement speed", "gyr_sd": "movement variability", "jerk": "jerkiness"}
+
+
+def pipeline_feature_label(key: str) -> Optional[str]:
+    """Plain name for a dataset-pipeline feature key (``emg_infraspinatus_mdf_rel`` ...), or None."""
+    k = key[:-4] if key.endswith("_rel") else key
+    if k == "t_end":
+        return "time into the exercise"
+    m = re.fullmatch(r"emg_(\w+)_(rms|mdf|mnf)", k)
+    if m and m.group(1) in _MUSCLE_WORDS:
+        return f"{_MUSCLE_WORDS[m.group(1)]} {_EMG_KIND[m.group(2)]}"
+    m = re.fullmatch(r"imu_(\w+?)_(gyr_mean|gyr_sd|jerk)", k)
+    if m and m.group(1) in _SITE_WORDS:
+        return f"{_SITE_WORDS[m.group(1)]} {_IMU_KIND[m.group(2)]}"
+    m = re.fullmatch(r"tempo_(\w+)_hz", k)
+    if m and m.group(1) in _SITE_WORDS:
+        return f"{_SITE_WORDS[m.group(1)]} repetition tempo"
+    return {"trunk_sternum_acc_sd": "trunk sway", "hr_bpm": "pulse rate",
+            "hrv_rmssd_ms": "pulse variability", "hrv_sdnn_ms": "pulse variability"}.get(k)
+
+
 def feature_label(key: str) -> str:
     """Everyday name for a feature key; unknown keys are humanised, never dropped."""
     entry = FEATURE_GLOSSARY.get(key)
     if entry:
         return entry[0]
-    return key.replace("_", " ").lower()
+    return pipeline_feature_label(key) or key.replace("_", " ").lower()
 
 
 def feature_meaning(key: str) -> Optional[str]:

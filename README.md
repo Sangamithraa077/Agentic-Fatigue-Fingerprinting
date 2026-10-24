@@ -11,7 +11,7 @@
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
   <img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933?logo=nodedotjs&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-386%20passing-brightgreen.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-419%20passing-brightgreen.svg">
   <img alt="AI coach" src="https://img.shields.io/badge/AI%20coach-Claude%20%7C%20Ollama%20%7C%20rule--based-8A63D2.svg">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
@@ -85,6 +85,13 @@ This release rebuilt the dashboard and the AI coach end to end.
 - **Measured retrieval:** 20 test questions, 85% found first and 100% in the top three (a 10-question decline test passes 10 of 10). The query terms were tuned after seeing misses, so treat these as optimistic, not held-out; run with `sentence-transformers` installed for dense retrieval
 - Hardware-simulator stream: its effort figure is now labelled as a test formula, its drivers are that formula's real terms (no invented SHAP values), and its trend is no longer always "steady"
 - Bug fixes: the "cure" filter no longer rejects "secure", and `verification_passed` no longer implies an AI answer
+
+**Dataset pipeline, live core and Session lab (Modules 1 to 14 of the work plan)**
+- **`ml/dataset_pipeline/`**: an audited, reproducible path from the raw recordings to leave-one-person-out Borg estimates: data audit, cleaning with flag columns (nothing silently deleted), features, baselines, augmentation tests and personalisation tests. Findings, including a corrupt recording and a data-entry error, are in [`docs/dataset_pipeline_modules_1_7.md`](docs/dataset_pipeline_modules_1_7.md)
+- **Session lab** (tab 6 of the dashboard): replay a recorded exercise and see the estimate against the athlete's own rating, generalised and personalised estimates, signals against the athlete's own start, the top drivers, data-quality flags, a background-written explanation labelled as generated text with its sources and the numbers it was allowed to use, an "ask your data" box that runs only fixed read-only lookups, and an exportable report. It works from the committed pipeline tables, so it needs no dataset and loads instantly
+- **Live core**: a data-source interface (recorded replay now, serial/Bluetooth hardware later), a streaming pipeline with a calibration flow, smoothing, alerts and session logs, a contract-checked hardware simulator, and a proof that replaying a recording reproduces the offline estimates exactly
+- **Explanation layer**: a full call log (inputs, output, retrieved notes, number check, delay), per-person history facts, trend wording judged against the person's own usual build-up, and an evaluation on real sessions (`reports/llm_eval/`)
+- Where each sub-task of the plan lives, and what is still open (real hardware, human usefulness ratings, language-model measurements): [`docs/modules_8_14.md`](docs/modules_8_14.md)
 
 **Repo hygiene:** unused template assets and an unreferenced PDF removed; new tests for the coach pipeline and API.
 
@@ -171,7 +178,9 @@ Pick an athlete, watch the recorded session replay live, and after ~30 s open **
 
 **Frontend hot reload (optional):** `cd dashboard && npm install && npm run dev` (still needs the backend running).
 
-**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and 5 tests that list or replay recordings fail without the dataset (386 pass, 3 skip, with it absent).
+**Session lab needs no dataset and no training:** open the dashboard and press `6`. It reads the committed pipeline tables in `reports/dataset_modules_1_7/`. Only the original *Live monitor* tabs need the raw data and the trained classifier from step 2. To rebuild the pipeline tables from the raw data, see [`docs/dataset_pipeline_modules_1_7.md`](docs/dataset_pipeline_modules_1_7.md).
+
+**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and 5 tests that list or replay recordings fail without the dataset (414 pass, 3 skip, 5 fail with it absent; 419 pass with it present). The new dataset-pipeline, live-core and Session lab tests (28) need neither the dataset nor a trained model.
 
 ### API at a glance
 
@@ -185,6 +194,11 @@ Pick an athlete, watch the recorded session replay live, and after ~30 s open **
 | `GET /api/reports/metrics` | Measured evaluation metrics from the research study |
 | `GET /api/signals/live/{id}` | Hardware-simulator stream (needs `X-API-Key`; set `FATIGUE_API_KEY`) |
 | `GET /api/health` | Status, active AI engine and retrieval backend |
+| `GET /api/pipeline/participants`, `.../participants/{id}/sessions`, `.../session/{id}/{task}` | Session lab data: estimates, own rating, trends, drivers, quality flags |
+| `POST /api/pipeline/explain` then `GET /api/pipeline/explain/{job}` | Selective, non-blocking explanation (`ml_only` when nothing needs explaining) |
+| `POST /api/pipeline/ask` | Ask your data: fixed read-only lookups only |
+| `GET /api/pipeline/report/{id}/{task}?format=html\|md` | Exportable session report |
+| `GET /api/pipeline/results`, `GET /api/pipeline/llm-evaluation` | The published evaluation tables |
 
 ---
 
@@ -210,6 +224,18 @@ Pick an athlete, watch the recorded session replay live, and after ~30 s open **
 | LSTM + attention | 2.48 | 0.09 | 25.9% |
 
 Ridge beats the LSTM and is far steadier across athletes, but **does not beat guessing the average on error**. That is why the dashboard labels every estimate with its method and typical error. Noise added to extracted features made models worse, so augmentation is off by default. Full write-up: [`research/`](research/README.md) and [`reports/`](reports/).
+
+**Dataset pipeline** (leave-one-person-out, 34 athletes, every 10 s window; [`docs/dataset_pipeline_modules_1_7.md`](docs/dataset_pipeline_modules_1_7.md)). Effort rises with time, so elapsed time alone is a strong baseline:
+
+| Model | MAE (Borg points) | Within 1 point |
+|---|---|---|
+| Train-mean dummy | 3.17 | 16% |
+| Elapsed time only | 1.79 | 34% |
+| Sensors only (relative to own start, random forest) | 1.92 | 31% |
+| Time + exercise condition (boosting) | 1.71 | 39% |
+| **Sensors + time + condition (boosting)**, shown in the Session lab | **1.65** | 40% |
+
+On exactly the 888 windows the earlier study scores, the study's median baseline is 2.18 and its Ridge 2.31, against 1.74 for elapsed time alone and 1.58 for the best pipeline model. The sensors-only model is no better than the study's median baseline; most of the gain comes from elapsed time and the exercise condition, and the sensors' own contribution on top is small and not significant (better for 19 of 34 athletes, p = 0.30). Personalising on the athlete's first 40 s gave no significant gain either (1.37 to 1.35). An earlier "first half" calibration that looked better (1.37 to 1.18) cannot be done live and is not relied on. Augmentation does not help.
 
 ---
 
@@ -299,11 +325,12 @@ Built on **WSD4FEDSRM**, *Wearable Sensor Data for Fatigue Estimation during Sho
 
 ## Documentation
 
-[`data_model_architecture`](docs/data_model_architecture.md) · [`preprocessing_pipeline`](docs/preprocessing_pipeline.md) · [`feature_engineering`](docs/feature_engineering.md) · [`baseline_models`](docs/baseline_models.md) · [`proposed_model`](docs/proposed_model.md) · [`explainability`](docs/explainability.md) · [`hardware_contract`](docs/hardware_contract.md) · [`research/README`](research/README.md)
+[`data_model_architecture`](docs/data_model_architecture.md) · [`preprocessing_pipeline`](docs/preprocessing_pipeline.md) · [`feature_engineering`](docs/feature_engineering.md) · [`baseline_models`](docs/baseline_models.md) · [`proposed_model`](docs/proposed_model.md) · [`explainability`](docs/explainability.md) · [`hardware_contract`](docs/hardware_contract.md) · [`dataset_pipeline_modules_1_7`](docs/dataset_pipeline_modules_1_7.md) · [`modules_8_14`](docs/modules_8_14.md) · [`dashboard_wireframe`](docs/dashboard_wireframe.md) · [`research/README`](research/README.md)
 
 ## Roadmap
 
-- Live wearable integration (the replay engine is already the seam for it)
+- Live wearable integration: the data-source interface and hardware contract are in place; the device reader (`SerialSource`) and a causal front-end filter still need a real device
+- Human evaluation of the explanation layer (usefulness ratings sheet is ready) and language-model delay and cost measurements
 - Streaming AI answers, edge deployment, and clinical validation studies
 - Federated learning across institutions, a companion mobile app, and CI on every pull request
 

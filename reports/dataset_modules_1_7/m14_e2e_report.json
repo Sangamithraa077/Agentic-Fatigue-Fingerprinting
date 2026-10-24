@@ -1,0 +1,174 @@
+{
+  "simulator": "synthetic (not recorded data)",
+  "runs": [
+    {
+      "mode": "off",
+      "seconds": 160,
+      "windows": 16,
+      "contract_issues_in_chunks": 0,
+      "first_estimate_s": 20.0,
+      "estimate_vs_simulated_effort": {
+        "pearson_r": 0.8540967421341629,
+        "mean_abs_diff_borg_points_after_40s": 3.837599838929421
+      },
+      "alerts": [
+        {
+          "level": "warning",
+          "t": 60.0,
+          "value": 16.15
+        },
+        {
+          "level": "stop",
+          "t": 80.0,
+          "value": 18.27
+        }
+      ],
+      "dropout_windows_flagged": [
+        6,
+        7
+      ],
+      "window_processing_ms": {
+        "mean": 104.41812500000002,
+        "p95": 151.335,
+        "max": 162.03,
+        "budget_ms": 10000
+      },
+      "loop_never_waited_for_explanations": true,
+      "max_push_ms_including_explainer_submit": 162.6663000206463,
+      "explanations": {
+        "triggered": 11,
+        "ml_only_windows": 4,
+        "from_language_model": 0,
+        "fell_back": 11,
+        "fallback_reasons": [
+          "no_llm_configured"
+        ],
+        "latest": {
+          "t": 160.0,
+          "trigger": "CRITICAL_EXHAUSTION_THRESHOLD_EXCEEDED",
+          "text": "Effort is extremely hard, 19.5 out of 20, and holding steady. The duration of each rotation cycle (internal-to-external-return) lengthens as the prime movers fatigue. [PHYS-IMU-02]",
+          "is_llm": false,
+          "fallback_reason": "no_llm_configured",
+          "delay_ms": 2.5
+        }
+      },
+      "logged_calls": 11,
+      "calls_with_all_numbers_grounded": 11,
+      "calibration_final": "calibrated",
+      "session_log": "reports\\sessions\\e2e_off.jsonl",
+      "wall_seconds": 2.08
+    },
+    {
+      "mode": "mock",
+      "seconds": 160,
+      "windows": 16,
+      "contract_issues_in_chunks": 0,
+      "first_estimate_s": 20.0,
+      "estimate_vs_simulated_effort": {
+        "pearson_r": 0.8540967421341629,
+        "mean_abs_diff_borg_points_after_40s": 3.837599838929421
+      },
+      "alerts": [
+        {
+          "level": "warning",
+          "t": 60.0,
+          "value": 16.15
+        },
+        {
+          "level": "stop",
+          "t": 80.0,
+          "value": 18.27
+        }
+      ],
+      "dropout_windows_flagged": [
+        6,
+        7
+      ],
+      "window_processing_ms": {
+        "mean": 99.24937499999999,
+        "p95": 143.8325,
+        "max": 157.25,
+        "budget_ms": 10000
+      },
+      "loop_never_waited_for_explanations": true,
+      "max_push_ms_including_explainer_submit": 158.35749998223037,
+      "explanations": {
+        "triggered": 11,
+        "ml_only_windows": 4,
+        "from_language_model": 11,
+        "fell_back": 0,
+        "fallback_reasons": [],
+        "latest": {
+          "t": 160.0,
+          "trigger": "CRITICAL_EXHAUSTION_THRESHOLD_EXCEEDED",
+          "text": "Effort is extremely hard at 19.5 out of 20 and holding steady. Keep watching it over the next minute.",
+          "is_llm": true,
+          "fallback_reason": null,
+          "delay_ms": 302.6
+        }
+      },
+      "logged_calls": 11,
+      "calls_with_all_numbers_grounded": 11,
+      "calibration_final": "calibrated",
+      "session_log": "reports\\sessions\\e2e_mock.jsonl",
+      "wall_seconds": 1.98
+    },
+    {
+      "mode": "lying",
+      "seconds": 160,
+      "windows": 16,
+      "contract_issues_in_chunks": 0,
+      "first_estimate_s": 20.0,
+      "estimate_vs_simulated_effort": {
+        "pearson_r": 0.8540967421341629,
+        "mean_abs_diff_borg_points_after_40s": 3.837599838929421
+      },
+      "alerts": [
+        {
+          "level": "warning",
+          "t": 60.0,
+          "value": 16.15
+        },
+        {
+          "level": "stop",
+          "t": 80.0,
+          "value": 18.27
+        }
+      ],
+      "dropout_windows_flagged": [
+        6,
+        7
+      ],
+      "window_processing_ms": {
+        "mean": 82.900625,
+        "p95": 137.7675,
+        "max": 145.8,
+        "budget_ms": 10000
+      },
+      "loop_never_waited_for_explanations": true,
+      "max_push_ms_including_explainer_submit": 146.90039999550208,
+      "explanations": {
+        "triggered": 11,
+        "ml_only_windows": 4,
+        "from_language_model": 0,
+        "fell_back": 11,
+        "fallback_reasons": [
+          "ungrounded_numbers"
+        ],
+        "latest": {
+          "t": 160.0,
+          "trigger": "CRITICAL_EXHAUSTION_THRESHOLD_EXCEEDED",
+          "text": "Effort is extremely hard, 19.5 out of 20, and holding steady. The duration of each rotation cycle (internal-to-external-return) lengthens as the prime movers fatigue. [PHYS-IMU-02]",
+          "is_llm": false,
+          "fallback_reason": "ungrounded_numbers",
+          "delay_ms": 2.5
+        }
+      },
+      "logged_calls": 11,
+      "calls_with_all_numbers_grounded": 11,
+      "calibration_final": "calibrated",
+      "session_log": "reports\\sessions\\e2e_lying.jsonl",
+      "wall_seconds": 1.69
+    }
+  ]
+}

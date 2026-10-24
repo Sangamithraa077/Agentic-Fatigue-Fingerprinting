@@ -53,3 +53,10 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Explanation call log and live session logs (Module 10.6 / 11.5)
+reports/llm_call_log.jsonl
+reports/sessions/
+reports/*.log
+# Large regenerable pipeline outputs
+reports/dataset_modules_1_7/m6_aug_features_*.csv

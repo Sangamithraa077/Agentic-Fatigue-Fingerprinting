@@ -50,6 +50,8 @@ class SessionSummary:
         for feat in self.top_contributing_features:
             if "impact" in feat:
                 numbers.append(round(float(feat["impact"]), 2))
+        # Further computed numbers the pipeline registers for this summary (e.g. the person's own history)
+        numbers.extend(round(float(v), 2) for v in self.metadata.get("allowed_numbers", []))
         # Add integer versions
         int_numbers = [float(int(n)) for n in numbers]
         return list(set(numbers + int_numbers))
@@ -65,8 +67,15 @@ def build_session_summary_from_pipeline(
     quality_warnings: Optional[List[str]] = None,
     is_calibrated: bool = True,
     model_name: str = "CrossModalAttention_v2",
+    usual_rate_per_min: Optional[float] = None,
 ) -> SessionSummary:
-    """Builds a structured SessionSummary from pipeline inference outputs."""
+    """Builds a structured SessionSummary from pipeline inference outputs.
+
+    ``usual_rate_per_min`` is how fast this person's effort normally builds (Borg points per minute). When given, the
+    trend is judged against it (sharp = 1.5x their usual, steady = under a quarter of it), because in an exercise-to-
+    exhaustion protocol effort climbs about 10 points a minute for everyone and the fixed 2 points/minute rule would
+    call every window "sharp". Without it the fixed thresholds apply.
+    """
     if previous_rpe is None:
         previous_rpe = current_rpe
 
@@ -74,11 +83,12 @@ def build_session_summary_from_pipeline(
     time_min = max(0.1, time_span_seconds / 60.0)
     rate_per_min = delta_rpe / time_min
 
-    if rate_per_min > 2.0:
+    sharp, slow = (1.5 * usual_rate_per_min, 0.25 * usual_rate_per_min) if usual_rate_per_min else (2.0, 0.5)
+    if rate_per_min > sharp:
         trend = "RISING_SHARPLY"
-    elif rate_per_min > 0.5:
+    elif rate_per_min > slow:
         trend = "RISING_SLOWLY"
-    elif rate_per_min < -0.5:
+    elif rate_per_min < -slow:
         trend = "DECLINING"
     else:
         trend = "STABLE"

@@ -710,6 +710,7 @@ const TAB_TITLES = {
   explainability: { title: 'Drivers', sub: 'Which signals are moving the current reading, and in which direction.' },
   personalization: { title: 'Athlete profile', sub: 'The background used to compare this athlete with their own usual signals.' },
   agents: { title: 'AI coach', sub: 'Ask questions, get recommendations, and see the evidence behind them.' },
+  lab: { title: 'Session lab', sub: 'Replay a recorded exercise: estimate versus the athlete\'s own rating, personalisation, drivers and explanation.' },
 };
 const TAB_ORDER = Object.keys(TAB_TITLES);
 
@@ -723,8 +724,10 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${name}`));
   setText('pageTitle', TAB_TITLES[name].title);
   setText('pageSubtitle', TAB_TITLES[name].sub);
+  document.body.dataset.tab = name; // lets the stylesheet hide the live-replay strip on the Session lab
   // Charts drawn while hidden have no size; refit them when their tab opens.
   Object.values(charts).forEach((c) => c && c.resize());
+  window.dispatchEvent(new CustomEvent('tabchange', { detail: name }));
 }
 
 function initNavigation() {
@@ -753,8 +756,10 @@ function initNavigation() {
       e.preventDefault();
       switchTab('agents');
       $('askDataInput').focus();
-    } else if (!typing && /^[1-5]$/.test(e.key)) {
+    } else if (!typing && /^[1-6]$/.test(e.key)) {
       switchTab(TAB_ORDER[Number(e.key) - 1]);
+    } else if (!typing && e.key === ' ' && document.body.dataset.tab === 'lab') {
+      // the Session lab handles its own play / pause (lab.js)
     } else if (!typing && e.key === ' ' && document.activeElement?.tagName !== 'BUTTON') {
       e.preventDefault();
       $('togglePlayback').click();

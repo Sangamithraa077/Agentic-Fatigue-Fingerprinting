@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field  # type: ignore
 
 from backend.agents.data_agent import DataIntelligenceAgent
 from backend.agents.orchestrator import AgentOrchestrator
+from backend.api.pipeline_routes import router as pipeline_router, set_hybrid_router
 from backend.api.replay_routes import router as replay_router
 from backend.services import replay_engine
 from ml.hardware.streaming_engine import StreamingWindowProcessor
@@ -68,6 +69,7 @@ app.add_middleware(
 )
 
 app.include_router(replay_router)
+app.include_router(pipeline_router)
 
 # Mount Dashboard Static Files
 dashboard_dir = Path(__file__).resolve().parents[2] / "dashboard"
@@ -76,7 +78,10 @@ if dashboard_dir.exists():
 
 # Global instances
 rag_kb = LocalRAGKnowledgeBase()
-hybrid_router = HybridRouter(knowledge_base=rag_kb)
+# Module 10.6: every explanation call (inputs, output, chunks, number check, delay) is appended to this JSONL file.
+CALL_LOG_PATH = Path(os.environ.get("FATIGUE_CALL_LOG", Path(project_root) / "reports" / "llm_call_log.jsonl"))
+hybrid_router = HybridRouter(knowledge_base=rag_kb, call_log_path=CALL_LOG_PATH)
+set_hybrid_router(hybrid_router)
 streaming_processor = StreamingWindowProcessor(router=hybrid_router)
 
 # Name reported to the explanation layer for the models that actually produce
@@ -303,6 +308,7 @@ def get_rag_sources():
                 "title": c.title,
                 "category": c.category,
                 "source": c.source,
+                "licence": c.licence,
                 "date": c.date,
                 "tags": c.tags,
             }

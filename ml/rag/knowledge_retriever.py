@@ -38,6 +38,7 @@ class KnowledgeChunk:
     body: str
     tags: List[str] = field(default_factory=list)
     file_path: Optional[str] = None
+    licence: str = ""          # licence or provenance of the text (Module 8.1c); empty when not recorded
 
     def format_citation(self) -> str:
         """Formatted source citation for evidence grounding."""
@@ -101,7 +102,7 @@ class LocalRAGKnowledgeBase:
             self.chunks.append(KnowledgeChunk(
                 chunk_id=chunk_id, title=title, category=category,
                 source=source, date=date, body=body, tags=tags,
-                file_path=str(md_file),
+                file_path=str(md_file), licence=meta.get("licence", ""),
             ))
 
     def _build_index(self) -> None:
