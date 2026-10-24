@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/style.css">
+    <link rel="stylesheet" href="./src/lab.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"></script>
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   </head>
@@ -43,6 +44,7 @@
           <button class="nav-item" role="tab" aria-selected="false" aria-controls="tab-explainability" data-tab="explainability"><i data-lucide="git-branch"></i><span>Drivers</span><kbd>3</kbd></button>
           <button class="nav-item" role="tab" aria-selected="false" aria-controls="tab-personalization" data-tab="personalization"><i data-lucide="user-round"></i><span>Athlete profile</span><kbd>4</kbd></button>
           <button class="nav-item" role="tab" aria-selected="false" aria-controls="tab-agents" data-tab="agents"><i data-lucide="sparkles"></i><span>AI coach</span><kbd>5</kbd></button>
+          <button class="nav-item" role="tab" aria-selected="false" aria-controls="tab-lab" data-tab="lab"><i data-lucide="flask-conical"></i><span>Session lab</span><kbd>6</kbd></button>
         </nav>
 
         <div class="sidebar-footer">
@@ -333,10 +335,121 @@
             </div>
           </section>
 
+          <!-- 6. SESSION LAB -->
+          <section id="tab-lab" class="tab-panel" role="tabpanel" aria-label="Session lab">
+            <div class="banner banner-error" id="labError" role="alert" hidden></div>
+
+            <article class="card lab-controls">
+              <div class="lab-pickers">
+                <div class="field"><label for="labPerson">Participant</label><select id="labPerson"><option>Loading…</option></select></div>
+                <div class="field"><label for="labTask">Exercise</label><select id="labTask" disabled></select></div>
+                <div class="field">
+                  <label>Estimate shown</label>
+                  <div class="seg" id="labModel" role="group" aria-label="Which estimate drives the gauge">
+                    <button type="button" class="seg-btn active" data-model="generalised" title="Trained on the other 33 people">Generalised</button>
+                    <button type="button" class="seg-btn" data-model="personalised" title="Scaled to this person's own first 40 seconds">Personalised</button>
+                  </div>
+                </div>
+              </div>
+              <div class="lab-transport">
+                <button class="btn btn-outline" id="labPlay" type="button"><i data-lucide="play"></i><span>Play</span></button>
+                <button class="btn btn-ghost btn-icon" id="labRestart" type="button" aria-label="Restart" title="Restart"><i data-lucide="rotate-ccw"></i></button>
+                <input type="range" id="labScrub" min="0" max="0" value="0" step="1" aria-label="Position in the session" disabled>
+                <output id="labClock">0 s</output>
+                <div class="seg" id="labSpeed" role="group" aria-label="Playback speed">
+                  <button type="button" class="seg-btn" data-speed="1" title="Real time: one 10-second window every 10 seconds">1×</button>
+                  <button type="button" class="seg-btn" data-speed="4">4×</button>
+                  <button type="button" class="seg-btn active" data-speed="10">10×</button>
+                </div>
+              </div>
+              <p class="fine banner-note" id="labPersonalNote" hidden></p>
+              <p class="fine" id="labSourceNote">Recorded sessions from the study dataset. The "self-reported" line is what the athlete said; it is shown for comparison and is never an input to the estimate.</p>
+            </article>
+
+            <div class="lab-top">
+              <article class="card lab-gauge-card">
+                <header class="card-head"><div><h3>Effort now</h3><p id="labGaugeSub">Pick a participant and press play.</p></div></header>
+                <div class="lab-gauge" aria-live="polite">
+                  <svg viewBox="0 0 220 128" id="labGauge" role="img" aria-label="Effort gauge">
+                    <path class="g-track" d="M 20 110 A 90 90 0 0 1 200 110"/>
+                    <path id="labGaugeFill" class="g-fill" d="M 20 110 A 90 90 0 0 1 20 110"/>
+                    <line id="labNeedle" class="g-needle" x1="110" y1="110" x2="30" y2="110"/>
+                    <circle cx="110" cy="110" r="5" class="g-hub"/>
+                    <text x="14" y="126" class="g-lbl">6</text><text x="106" y="14" class="g-lbl">13</text><text x="196" y="126" class="g-lbl">20</text>
+                  </svg>
+                  <div class="gauge-value"><span id="labGaugeValue">--</span><small>of 20</small></div>
+                </div>
+                <div class="lab-status">
+                  <span class="status-pill tone-neutral" id="labStatus"><span class="pill-dot"></span><span id="labStatusText">Ready</span></span>
+                  <span class="chip chip-quiet" id="labCalChip">Baseline: waiting</span>
+                </div>
+                <dl class="kv">
+                  <div><dt>Athlete's own rating</dt><dd id="labSelf">--</dd></div>
+                  <div><dt>Difference</dt><dd id="labDiff">--</dd></div>
+                  <div><dt>Quality score</dt><dd id="labQuality">--</dd></div>
+                </dl>
+                <div class="lab-alerts" id="labAlerts" aria-live="assertive"></div>
+              </article>
+
+              <article class="card lab-chart-card">
+                <header class="card-head"><div><h3>Estimated versus self-reported effort</h3><p>Zones follow the Borg scale: warning at 15, stop at 18. The estimate is smoothed over the last windows.</p></div></header>
+                <div class="chart-box tall"><canvas id="labRpeChart" aria-label="Estimated versus self-reported effort chart"></canvas></div>
+              </article>
+            </div>
+
+            <div class="lab-mid">
+              <article class="card">
+                <header class="card-head"><div><h3>Signals against the athlete's own start</h3><p>Percent change from the first 20 seconds of this exercise. Muscle signal speed falls and pulse rises as effort builds.</p></div></header>
+                <div class="chips" id="labTrendChips" role="group" aria-label="Choose signals"></div>
+                <div class="chart-box"><canvas id="labTrendChart" aria-label="Signal trends against the athlete's baseline"></canvas></div>
+              </article>
+
+              <article class="card">
+                <header class="card-head"><div><h3>What is behind this estimate</h3><p>How far each signal moves the estimate, in Borg points.</p></div></header>
+                <ul class="drivers" id="labDrivers"><li class="muted">Press play.</li></ul>
+                <h4 class="sub-h">Data quality</h4>
+                <div id="labQualityList" class="qlist"><span class="chip chip-quiet">All channels clean</span></div>
+                <h4 class="sub-h">Athlete profile</h4>
+                <dl class="kv kv-tight" id="labProfile"></dl>
+              </article>
+            </div>
+
+            <div class="lab-bottom">
+              <article class="card lab-explain">
+                <header class="card-head">
+                  <div><h3>Explanation</h3><p id="labExplainSub">Written only when something needs explaining: effort above 15, a sharp rise, the end of the session, or when you ask.</p></div>
+                  <button class="btn btn-soft btn-sm" id="labExplainNow" type="button" disabled><i data-lucide="message-square-text"></i><span>Explain now</span></button>
+                </header>
+                <div id="labExplainBody" class="explain-body"><p class="muted">No explanation yet. The estimate keeps running without one.</p></div>
+                <div id="labExplainMeta" class="explain-meta" hidden></div>
+                <div class="actions-row">
+                  <a class="btn btn-ghost btn-sm" id="labReportHtml" target="_blank" rel="noopener" aria-disabled="true"><i data-lucide="file-text"></i><span>Open report</span></a>
+                  <a class="btn btn-ghost btn-sm" id="labReportMd" aria-disabled="true"><i data-lucide="download"></i><span>Download .md</span></a>
+                </div>
+              </article>
+
+              <article class="card lab-ask">
+                <header class="card-head"><div><h3>Ask your data</h3><p>Answers come from fixed, read-only lookups on this session's stored results, not from free-form queries.</p></div></header>
+                <form class="composer" id="labAskForm" autocomplete="off">
+                  <input type="text" id="labAskInput" class="text-input" maxlength="300" placeholder="e.g. When did effort reach the warning level?" aria-label="Question about this session's data">
+                  <button class="btn btn-primary" type="submit"><i data-lucide="search"></i><span>Look up</span></button>
+                </form>
+                <div class="chips" id="labAskChips"></div>
+                <div id="labAskAnswer" class="ask-answer" aria-live="polite"></div>
+              </article>
+            </div>
+
+            <details class="tech" id="labResults">
+              <summary>How accurate is this? Published results</summary>
+              <div class="tech-body" id="labResultsBody"><p class="muted">Loading…</p></div>
+            </details>
+          </section>
+
         </div>
       </main>
     </div>
 
     <script src="./src/main.js"></script>
+    <script src="./src/lab.js"></script>
   </body>
 </html>

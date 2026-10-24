@@ -4,6 +4,7 @@ title: Selective RAG and Representation Before Retrieval in Clinical AI
 category: literature
 source: Bioengineering (2026) / medRxiv (2026)
 date: 2026-02-15
+licence: own summary, no text copied; check each paper's licence at its source before quoting
 tags: [hybrid_ml_llm, rag, representation_before_retrieval, guardrails]
 ---
 # Selective RAG and Representation Before Retrieval in Clinical AI

@@ -1,0 +1,14 @@
+model,n_windows,source,MAE,within1
+Research: training median,888,research/,2.179054054054054,0.34346846846846846
+Research: Ridge (deployed),888,research/,2.3139024251126132,0.22747747747747749
+Research: LSTM + attention,888,research/,2.4777176850013904,0.25900900900900903
+Modules 5b: Time only (isotonic) [Module 5],888,ml/dataset_pipeline,1.7439449122610882,0.375
+"Modules 5b: Time + condition, RF",888,ml/dataset_pipeline,1.6838213509692623,0.31981981981981983
+"Modules 5b: Time + condition, boosting",888,ml/dataset_pipeline,1.6132429417167282,0.4155405405405405
+"Modules 5b: Fused sensors, RF [Module 5]",888,ml/dataset_pipeline,1.925765555956489,0.31756756756756754
+"Modules 5b: Fused sensors + time + condition, RF",888,ml/dataset_pipeline,1.6780392533658979,0.32432432432432434
+"Modules 5b: Fused sensors + time + condition, boosting",888,ml/dataset_pipeline,1.5781925940145127,0.4313063063063063
+"Modules 5b: Fused + history + time + condition, RF",888,ml/dataset_pipeline,1.67522212742748,0.3367117117117117
+"Modules 5b: Fused + history + time + condition, boosting",888,ml/dataset_pipeline,1.5698982042780527,0.4189189189189189
+"Modules 5b: Fused + history + time + condition, Ridge",888,ml/dataset_pipeline,1.6189796408043926,0.43018018018018017
+"Modules 5b: EMG core + history + time + condition, RF",888,ml/dataset_pipeline,1.6673314541310427,0.3547297297297297

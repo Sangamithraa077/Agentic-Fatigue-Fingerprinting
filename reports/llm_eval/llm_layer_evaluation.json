@@ -1,0 +1,65 @@
+{
+  "llm_backend_available": "template",
+  "faithfulness": {
+    "n": 50,
+    "windows": "random real windows (seed 7) from the pipeline sessions",
+    "template_numbers_all_grounded_pct": 100.0,
+    "llm": null,
+    "llm_note": "no language model configured here (set ANTHROPIC_API_KEY or run Ollama); not measured"
+  },
+  "guardrail": {
+    "n": 50,
+    "invented_numbers_caught_and_replaced_pct": 100.0,
+    "method": "mock model that always states a pulse of 142 and a drop of 37%, which are in no summary"
+  },
+  "hallucination": {
+    "declined_pct": 100.0,
+    "passed": 10,
+    "total": 10
+  },
+  "retrieval": {
+    "top1_pct": 85.0,
+    "top3_pct": 100.0,
+    "queries": 20,
+    "backend": "sparse:tfidf",
+    "answers_citing_a_note_pct": 100.0,
+    "caveat": "query expansion terms were tuned after seeing misses on these questions: optimistic, not held-out"
+  },
+  "cost_and_speed": {
+    "windows_in_all_recorded_sessions": 1309,
+    "windows_where_a_call_fires": 555,
+    "selective_call_share_pct": 42.39877769289534,
+    "calls_saved_vs_always_call_pct": 57.60122230710466,
+    "fires_by_trigger": {
+      "ML_TELEMETRY_ONLY": 0,
+      "HEAVY_FATIGUE_WARNING_THRESHOLD": 359,
+      "CRITICAL_EXHAUSTION_THRESHOLD_EXCEEDED": 139,
+      "SESSION_CONCLUDED_SUMMARY": 46,
+      "SHARP_FATIGUE_TREND_ACCELERATION": 11
+    },
+    "template_delay_ms": {
+      "median": 3.0054000089876354,
+      "p95": 4.615115007618441
+    },
+    "language_model_delay_ms": null,
+    "language_model_delay_note": "not measured: no language model configured in this run",
+    "prompt_characters_per_call": 4995,
+    "approx_prompt_tokens_per_call": 1248,
+    "note": "cost per call = tokens x the chosen model's price; prices are not hard-coded here"
+  },
+  "ablation": {
+    "ml_only": {
+      "flesch_reading_ease_mean": 63.27327843321541,
+      "words_mean": 17.9
+    },
+    "ml_plus_explanation": {
+      "flesch_reading_ease_mean": 50.63437454099387,
+      "words_mean": 83.54
+    },
+    "note": "readability and length are proxies. Clarity and helpfulness ratings from people are still to be collected (13.4)."
+  },
+  "usefulness": {
+    "status": "not collected",
+    "how": "give usefulness_rating_sheet.csv to 3-5 people, then run python -m ml.dataset_pipeline.aggregate_ratings"
+  }
+}

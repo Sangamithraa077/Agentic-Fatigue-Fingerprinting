@@ -1,0 +1,7 @@
+participant,task,windows_compared,max_abs_diff_generalised,max_abs_diff_personalised,live_windows,offline_windows
+1,task4_35e,4,0.0,0.0,7,6
+5,task2_45i,7,0.0,0.0,9,9
+12,task6_55e,2,0.0,0.0,5,4
+20,task1_35i,9,0.0,0.0,11,11
+27,task3_55i,5,0.0,0.0,8,7
+33,task1_35i,9,0.0,0.0,11,11

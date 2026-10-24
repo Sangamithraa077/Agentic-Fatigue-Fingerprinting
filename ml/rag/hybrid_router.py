@@ -16,11 +16,14 @@ the number checker enforces it, so a chat-style answer can never invent a figure
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ml.rag.feature_glossary import effort_word, feature_label, humanise_text
@@ -195,8 +198,12 @@ class HybridRouter:
         use_ollama: Optional[bool] = None,
         anthropic_model: Optional[str] = None,
         use_anthropic: Optional[bool] = None,
+        call_log_path: Optional[Path] = None,
     ):
         self.kb = knowledge_base or LocalRAGKnowledgeBase()
+        # Module 10.6: every call is also appended, with full inputs and outputs, to this JSONL file (if given).
+        self.call_log_path = Path(call_log_path) if call_log_path else None
+        self._log_lock = threading.Lock()
         self.checker = NumberChecker()
         self.rpe_warning_threshold = rpe_warning_threshold
         self.rpe_critical_threshold = rpe_critical_threshold
@@ -372,6 +379,10 @@ class HybridRouter:
             caution = "This is an early, rough figure from the fatigue detector, so treat it with extra care."
         elif "SURROGATE_ESTIMATE_NOT_A_TRAINED_MODEL" in flags:
             caution = "This figure comes from a simple test formula on simulated sensor data, not from the trained model."
+        elif any("unreliable" in f.lower() for f in flags):
+            caution = "One or more sensor channels were unreliable in this window, so treat this reading with extra care."
+        elif "BASELINE_STILL_FORMING" in flags:
+            caution = "This is still within the first 20 seconds that set this athlete's own baseline, so the reading is only rough."
 
         if intent == "advice":
             parts = [self._advice_line(summary), status]
@@ -403,7 +414,7 @@ class HybridRouter:
         facts = [
             f"Effort estimate (Borg 6-20 scale): {summary.current_fatigue_index:.1f} ({effort_word(summary.current_fatigue_index)})",
             f"Trend: {self._trend_phrase(summary)} ({summary.rate_of_rpe_change_per_min:+.1f} points per minute)",
-            f"Time into this exercise: {summary.time_span_seconds:.0f} seconds",
+            f"Time into this exercise: {summary.metadata.get('elapsed_seconds', summary.time_span_seconds):.0f} seconds",
             f"Athlete: {summary.person_id}",
             f"Adjustment: {humanise_text(summary.calibration_status)}",
             f"Warning threshold: {self.rpe_warning_threshold:.0f}; stop threshold: {self.rpe_critical_threshold:.0f}",
@@ -415,7 +426,10 @@ class HybridRouter:
             )
             facts.append(f"Main drivers: {drivers}")
         if summary.baseline_changes:
-            baseline = ", ".join(f"{feature_label(k)} {v:+.1f} standard deviations from this athlete's usual" for k, v in list(summary.baseline_changes.items())[:4])
+            if summary.metadata.get("baseline_unit") == "percent":
+                baseline = ", ".join(f"{feature_label(k)} {v:+.0f}% from this athlete's own start" for k, v in list(summary.baseline_changes.items())[:4])
+            else:
+                baseline = ", ".join(f"{feature_label(k)} {v:+.1f} standard deviations from this athlete's usual" for k, v in list(summary.baseline_changes.items())[:4])
             facts.append(f"Versus the athlete's own usual: {baseline}")
         quality = [f for f in summary.data_quality_flags if f not in ("SIGNAL_AUDIT_CERTIFIED", "ALL_CHANNELS_OK")]
         facts.append("Data quality: " + (", ".join(q.replace("_", " ").lower() for q in quality) if quality else "clean"))
@@ -451,6 +465,49 @@ class HybridRouter:
         if repair_note:
             prompt += f"\nCORRECTION NEEDED: {repair_note}\n"
         return prompt + "\nANSWER:"
+
+    # ------------------------------------------------------------------ call log (Module 10.6)
+
+    def _record_call(
+        self,
+        summary: SessionSummary,
+        user_query: Optional[str],
+        output: str,
+        *,
+        intent: str,
+        trigger: str,
+        is_llm: bool,
+        attempts: int,
+        fallback_reason: Optional[str],
+        chunk_ids: List[str],
+        source_tags: List[str],
+        delay_ms: float,
+    ) -> None:
+        """Keep the short in-memory log and append the full record (inputs, output, chunks, number check,
+        delay) to the JSONL file when one is configured."""
+        check = self.checker.verify(output, summary)
+        self.call_logs.append({
+            "timestamp": time.time(), "person_id": summary.person_id, "rpe": summary.current_fatigue_index,
+            "trigger": trigger, "intent": intent, "is_llm": is_llm, "attempts": attempts,
+            "fallback_reason": fallback_reason, "sources": source_tags, "delay_ms": delay_ms,
+        })
+        del self.call_logs[:-MAX_CALL_LOGS]
+        if self.call_log_path is None:
+            return
+        record = {
+            "timestamp": time.time(), "trigger": trigger, "intent": intent, "query": user_query,
+            "input_summary": summary.to_dict(), "output": output, "is_llm": is_llm, "llm_backend": self._llm_backend,
+            "attempts": attempts, "fallback_reason": fallback_reason, "retrieved_chunk_ids": chunk_ids,
+            "number_check": {"passed": check.is_valid, "numbers": check.extracted_numbers,
+                             "ungrounded": check.ungrounded_numbers},
+            "delay_ms": round(delay_ms, 2),
+        }
+        try:
+            self.call_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._log_lock, open(self.call_log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+        except OSError as exc:                       # logging must never break an explanation
+            logger.warning("could not write call log: %s", exc)
 
     # ------------------------------------------------------------------ main entry
 
@@ -502,8 +559,13 @@ class HybridRouter:
         session_concluded: bool = False,
         force_trigger: bool = False,
         history: Optional[List[Dict[str, str]]] = None,
+        extra_chunks: Optional[List[KnowledgeChunk]] = None,
     ) -> ExplanationResponse:
-        """Main explanation pipeline with guardrails and verifier."""
+        """Main explanation pipeline with guardrails and verifier.
+
+        ``extra_chunks`` are knowledge notes that are always offered to the model in addition to what retrieval
+        finds, e.g. the active person's own history (Module 8.1d, see ml.rag.person_facts).
+        """
         t0 = time.perf_counter()
         intent = classify_intent(user_query)
 
@@ -532,12 +594,9 @@ class HybridRouter:
         if intent == "out_of_scope":
             # Decline deterministically: no retrieval, no language model, nothing to hallucinate.
             total_time_ms = (time.perf_counter() - t0) * 1000.0
-            self.call_logs.append({
-                "timestamp": time.time(), "person_id": summary.person_id, "rpe": summary.current_fatigue_index,
-                "trigger": trigger_reason, "intent": intent, "is_llm": False, "attempts": 0,
-                "fallback_reason": "out_of_scope", "sources": [], "delay_ms": total_time_ms,
-            })
-            del self.call_logs[:-MAX_CALL_LOGS]
+            self._record_call(summary, user_query, OUT_OF_SCOPE_ANSWER, intent=intent, trigger=trigger_reason,
+                              is_llm=False, attempts=0, fallback_reason="out_of_scope", chunk_ids=[],
+                              source_tags=[], delay_ms=total_time_ms)
             return ExplanationResponse(
                 text=OUT_OF_SCOPE_ANSWER + SAFETY_DISCLAIMER,
                 triggered_by=trigger_reason,
@@ -566,6 +625,10 @@ class HybridRouter:
             search_query += " estimate error uncertainty validation"
         retrieved_results = self.kb.search(search_query, top_k=3)
         retrieved_chunks = [c for c, _ in retrieved_results]
+        have = {r.chunk_id for r in retrieved_chunks}
+        extras = [c for c in (extra_chunks or []) if c.chunk_id not in have]
+        retrieved_chunks = retrieved_chunks + extras            # retrieved notes stay first (template grounding)
+        retrieved_results = retrieved_results + [(c, 1.0) for c in extras]
         source_tags = [c.format_citation() for c in retrieved_chunks]
         source_details = [
             {
@@ -595,20 +658,11 @@ class HybridRouter:
         answer = humanise_text(generated_text)
         total_time_ms = (time.perf_counter() - t0) * 1000.0
 
-        # Log call (Module 10.6)
-        self.call_logs.append({
-            "timestamp": time.time(),
-            "person_id": summary.person_id,
-            "rpe": summary.current_fatigue_index,
-            "trigger": trigger_reason,
-            "intent": intent,
-            "is_llm": is_llm,
-            "attempts": attempts,
-            "fallback_reason": fallback_reason,
-            "sources": source_tags,
-            "delay_ms": total_time_ms,
-        })
-        del self.call_logs[:-MAX_CALL_LOGS]
+        # Log call (Module 10.6): inputs, output, retrieved chunks, number-check result and delay
+        self._record_call(summary, user_query, answer, intent=intent, trigger=trigger_reason, is_llm=is_llm,
+                          attempts=attempts, fallback_reason=fallback_reason,
+                          chunk_ids=[c.chunk_id for c in retrieved_chunks], source_tags=source_tags,
+                          delay_ms=total_time_ms)
 
         return ExplanationResponse(
             text=answer + SAFETY_DISCLAIMER,
