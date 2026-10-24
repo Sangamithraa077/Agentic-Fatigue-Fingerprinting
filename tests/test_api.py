@@ -198,6 +198,18 @@ def test_rag_explain_with_explicit_values_has_no_invented_baseline():
     assert "CALLER_SUPPLIED_VALUES_NOT_VERIFIED" in body["session_summary"]["data_quality_flags"]
 
 
+def test_rag_explain_reports_provenance_and_accepts_history():
+    body = client.post("/api/rag/explain", json={
+        "subject_id": "P03", "current_rpe": 15.2, "user_query": "What should I do now?",
+        "history": [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"}],
+    }).json()
+    assert body["source"] in ("llm", "template")
+    assert body["answer"] and "does not provide medical diagnosis" not in body["answer"]
+    assert isinstance(body["follow_ups"], list) and isinstance(body["source_details"], list)
+    bad = client.post("/api/rag/explain", json={"subject_id": "P03", "current_rpe": 15.2, "history": [{"role": "system", "content": "x"}]})
+    assert bad.status_code == 422
+
+
 def test_reports_metrics_serves_measured_values_only():
     data = client.get("/api/reports/metrics").json()
     assert data.get("source") != "reference_benchmarks"
