@@ -11,7 +11,7 @@
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
   <img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933?logo=nodedotjs&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-0A9EDC.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-386%20passing-brightgreen.svg">
   <img alt="AI coach" src="https://img.shields.io/badge/AI%20coach-Claude%20%7C%20Ollama%20%7C%20rule--based-8A63D2.svg">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
@@ -81,6 +81,9 @@ This release rebuilt the dashboard and the AI coach end to end.
 - **Honest provenance:** every answer says whether it was AI-written or rule-based, and why a fallback happened
 - Intent-aware answers (advice, meaning, reliability, summary, why), conversation memory for follow-ups, and plain-language names instead of feature keys
 - Sharper retrieval: everyday phrases like "muscle fibre tiredness" now find the right physiology note
+- **Declines what it can't know:** questions about blood pressure, injury, sleep, diet and the like get a clear "I can't tell that from these readings" with no model call and no invented figures
+- **Measured retrieval:** 20 test questions, 85% found first and 100% in the top three (a 10-question decline test passes 10 of 10). The query terms were tuned after seeing misses, so treat these as optimistic, not held-out; run with `sentence-transformers` installed for dense retrieval
+- Hardware-simulator stream: its effort figure is now labelled as a test formula, its drivers are that formula's real terms (no invented SHAP values), and its trend is no longer always "steady"
 - Bug fixes: the "cure" filter no longer rejects "secure", and `verification_passed` no longer implies an AI answer
 
 **Repo hygiene:** unused template assets and an unreferenced PDF removed; new tests for the coach pipeline and API.
@@ -168,7 +171,7 @@ Pick an athlete, watch the recorded session replay live, and after ~30 s open **
 
 **Frontend hot reload (optional):** `cd dashboard && npm install && npm run dev` (still needs the backend running).
 
-**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and API tests that replay recordings need the dataset.
+**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and 5 tests that list or replay recordings fail without the dataset (386 pass, 3 skip, with it absent).
 
 ### API at a glance
 

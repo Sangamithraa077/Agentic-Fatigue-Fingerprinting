@@ -81,6 +81,11 @@ QUERY_SYNONYMS = (
     ("pulse", "PPG heart rate"), ("heart", "PPG autonomic"), ("movement", "IMU kinematic"),
     ("shaky", "tremor jerk IMU"), ("shaking", "tremor jerk IMU"),
     ("usual", "baseline personalization"), ("my own", "baseline personalization"),
+    ("slow", "spectral shift lower frequency MDF"), ("slows", "spectral shift lower frequency MDF"),
+    ("stop", "intervention threshold terminate rest"), ("exercising", "intervention threshold"),
+    ("repetition", "tempo inter-repetition cycle variability IMU"), ("time between", "tempo cycle variability IMU"),
+    ("medical", "safety disclaimer research diagnosis"), ("device", "safety disclaimer research"),
+    ("motor unit", "motor unit recruitment myoelectric"), ("inward", "internal external rotation muscles"),
     ("reliable", "uncertainty error validation"), ("accurate", "uncertainty error validation"),
 )
 

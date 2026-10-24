@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from ml.rag.feature_glossary import expand_query
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
@@ -127,6 +128,9 @@ class LocalRAGKnowledgeBase:
         """Returns top_k most relevant knowledge chunks with similarity scores."""
         if not self.chunks:
             return []
+        # Everyday phrases ("muscle signal slows", "shaky arm") are mapped to the notes' vocabulary
+        # here so every caller, the coach and the evaluator alike, retrieves the same way.
+        query = expand_query(query)
 
         if self.use_dense and self._dense_model is not None and self._dense_embeddings is not None:
             query_emb = self._dense_model.encode([query], normalize_embeddings=True)

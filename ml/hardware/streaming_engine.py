@@ -49,6 +49,7 @@ class StreamingWindowProcessor:
         self.ppg_buffer: Deque[np.ndarray] = collections.deque(maxlen=200)
 
         self.last_smoothed_rpe: float = 6.0
+        self.previous_smoothed_rpe: Optional[float] = None  # None until a second window exists
         self.window_count: int = 0
         self.session_log: List[StreamingInferenceResult] = []
 
@@ -93,13 +94,18 @@ class StreamingWindowProcessor:
         imu_jerk = float(np.mean(np.abs(np.diff(imu_arr[:, 0])))) * 100.0
         ppg_std = float(np.std(ppg_arr))
 
-        # Model estimation (heuristic / model surrogate for demo stream)
-        # RPE increases with EMG RMS and IMU tremor jerk
-        raw_rpe = 6.0 + (emg_rms * 25.0) + (imu_jerk * 5.0)
-        raw_rpe = float(np.clip(raw_rpe, 6.0, 20.0))
+        # Effort estimate: a fixed linear SURROGATE, not the trained Ridge/Random Forest models
+        # (those need a full recorded session). It exists to exercise the sensor contract and is
+        # flagged as such in every summary it feeds to the explanation layer.
+        emg_term = emg_rms * 25.0
+        imu_term = imu_jerk * 5.0
+        raw_rpe = float(np.clip(6.0 + emg_term + imu_term, 6.0, 20.0))
 
-        # EMA Smoothing
-        smoothed_rpe = (self.ema_alpha * raw_rpe) + ((1.0 - self.ema_alpha) * self.last_smoothed_rpe)
+        # EMA Smoothing. The first window has no earlier value, so it must not look like a
+        # jump from the 6.0 starting point.
+        seed = raw_rpe if self.window_count == 1 else self.last_smoothed_rpe
+        smoothed_rpe = (self.ema_alpha * raw_rpe) + ((1.0 - self.ema_alpha) * seed)
+        self.previous_smoothed_rpe = None if self.window_count == 1 else self.last_smoothed_rpe
         self.last_smoothed_rpe = smoothed_rpe
 
         # Safety Alert Level
@@ -116,19 +122,21 @@ class StreamingWindowProcessor:
             "PPG_Pulse_Std": round(ppg_std, 3),
         }
 
-        # Build SessionSummary artifact for explanation router
-        shap_sim = {
-            "EMG_RMS_AntDeltoid": round((emg_rms - 0.15) * 15.0, 2),
-            "IMU_Jerk_UpperArm": round((imu_jerk - 0.2) * 8.0, 2),
-        }
+        # Build the SessionSummary the explanation layer is allowed to cite. The drivers are the
+        # surrogate formula's own terms (exact for a linear model); nothing is invented, and no
+        # athlete baseline exists for a simulated stream, so no baseline deviation is reported.
         summary = build_session_summary_from_pipeline(
             person_id=self.subject_id,
             current_rpe=smoothed_rpe,
-            previous_rpe=self.last_smoothed_rpe,
+            previous_rpe=self.previous_smoothed_rpe,
             time_span_seconds=float(self.window_count),
-            shap_values=shap_sim,
-            baseline_deviations={"EMG_RMS": round(emg_rms * 100, 1)},
-            model_name="StreamingProcessor_v2",
+            shap_values={
+                "EMG_RMS_AntDeltoid": round(emg_term, 2),
+                "IMU_Jerk_UpperArm": round(imu_term, 2),
+            },
+            quality_warnings=["SURROGATE_ESTIMATE_NOT_A_TRAINED_MODEL"],
+            is_calibrated=False,
+            model_name="Linear surrogate (simulator stream, not a trained model)",
         )
 
         # Execute selective hybrid explanation
