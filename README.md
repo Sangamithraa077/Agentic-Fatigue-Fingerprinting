@@ -11,7 +11,7 @@
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white">
   <img alt="Node 18+" src="https://img.shields.io/badge/node-18+-339933?logo=nodedotjs&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-0A9EDC.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-382%20passing-brightgreen.svg">
   <img alt="AI coach" src="https://img.shields.io/badge/AI%20coach-Claude%20%7C%20Ollama%20%7C%20rule--based-8A63D2.svg">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success.svg">
 </p>
@@ -168,7 +168,7 @@ Pick an athlete, watch the recorded session replay live, and after ~30 s open **
 
 **Frontend hot reload (optional):** `cd dashboard && npm install && npm run dev` (still needs the backend running).
 
-**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and API tests that replay recordings need the dataset.
+**Run the tests:** `python -m pytest tests/ -v`. A few tests skip when optional components (sentence-transformers, Ollama) aren't installed, and 5 tests that list or replay recordings fail without the dataset (382 pass, 3 skip, with it absent).
 
 ### API at a glance
 
