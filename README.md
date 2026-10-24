@@ -64,7 +64,7 @@ It also reports its own limits. The Borg RPE estimate is a research-grade indica
 
 **Live Product**
 - Real-time signal replay engine — streams an athlete's actual recorded session progressively, exactly as if a live sensor were attached, with the architecture already designed as a drop-in seam for a real sensor later
-- **Coach** — a plain-language recommendation ("Keep going" / "Slow down" / "Stop and rest") built directly from real agent output, with the agents' exact wording one click away, not a canned response
+- **AI coach** — a chat-style assistant plus a one-click safety check. Answers cite their sources, say whether they were AI-written or rule-based, and every figure in an AI-written answer is verified against the live data (see [AI coach pipeline](#ai-coach-pipeline)). The safety check gives a plain recommendation ("Keep going" / "Slow down" / "Stop and rest") from the real agent output, with the exact wording one click away
 - Dark & light themes, fully re-tinted design system, persisted per user
 - Written for athletes and coaches, not data scientists: everyday words, a few clear visuals, and the technical detail (raw signals, SHAP values, agent logs) tucked into collapsed panels
 - Accessible by default — focus states, `aria-live` regions, reduced-motion support
@@ -77,11 +77,13 @@ The dashboard is written for athletes and coaches with no technical background. 
 
 | Tab | What it shows |
 |---|---|
-| **Right Now** | What the athlete is doing and how their muscles are responding, with a simple effort trend. The raw EMG/IMU/PPG signals are one click away in a collapsed panel |
-| **How Tired?** | How hard the athlete is working on the 6–20 Borg scale, shown next to their own rating, with the method and typical error (about ±2.3) stated in plain words. For the first ~30 s of each exercise it says "Warming up" rather than showing an unvalidated guess |
-| **Why?** | The three biggest reasons behind the current reading, in everyday language; exact SHAP values are in a collapsed technical panel |
-| **About You** | The athlete's real details (age, height, strength), their earlier sessions, and how the fatigue chance changes once their own usual signals are taken into account |
-| **Coach** | A check-in with the real 4-agent backend that says what to do next, plus a box to ask a question and get an answer that cites its sources |
+| **Live monitor** | Muscle effort versus the athlete's own average, a fatigue marker, their self-rating, exercise progress and an effort trend. Raw EMG/IMU/PPG signals sit in a collapsed panel |
+| **Effort analysis** | Perceived effort on the 6–20 Borg scale next to the athlete's own rating, a zone chart with the warning (15) and stop (18) levels, and the method and typical error (about ±2.3) stated plainly. For the first ~30 s of each exercise it shows "Calibrating" rather than an unvalidated guess |
+| **Drivers** | The three biggest signals behind the current reading, which way each pushes it, and an "Ask the coach" shortcut. Exact SHAP values are in a collapsed panel |
+| **Athlete profile** | The athlete's real details (age, height, strength), earlier sessions, and how the fatigue likelihood changes once their own usual signals are taken into account |
+| **AI coach** | A conversation with the explanation layer (quick actions, follow-up suggestions, expandable sources, copy), plus a four-step safety check with an adjustable warning level |
+
+Other touches: an alert when effort crosses the warning level, an exported Markdown session report, keyboard shortcuts (`1`–`5` switch tabs, `Space` pauses, `/` jumps to the coach), light and dark themes that follow the system setting, and a layout that works on a phone.
 
 A persistent hero strip keeps the **effort score**, a one-word **status**, and the coach's latest advice visible no matter which tab is open, so the athlete's current state is never more than a glance away.
 
@@ -115,8 +117,8 @@ flowchart TD
 
     subgraph Frontend["Dashboard (dashboard/)"]
         L[Live Charts & Gauges]
-        M[How Tired? / Why?]
-        N[About You]
+        M[Effort analysis / Drivers]
+        N[Athlete profile]
         O[Coach]
     end
 
@@ -336,7 +338,7 @@ There's no hosted demo — the product replays real, non-public sensor recording
 2. Open `http://127.0.0.1:8000/dashboard/`
 3. Pick any of the 34 available athletes from the sidebar
 4. Watch their real recorded session replay live across every tab
-5. After about 30 seconds of an exercise the careful effort estimate appears; then open **Coach** and click **Check in** for a live, real 4-agent assessment
+5. After about 30 seconds of an exercise the careful effort estimate appears; then open **AI coach** and click **Run safety check** for a live, real 4-agent assessment
 
 First load for a given athlete takes up to about a minute — that's the real preprocessing and feature-extraction pipeline running over their actual recording, not a loading animation for its own sake.
 
@@ -352,6 +354,18 @@ Built and validated on **WSD4FEDSRM** — *Wearable Sensor Data for Fatigue Esti
 - **License** — distributed separately under CC BY 4.0 by its original authors and not redistributed in this repository. See [`docs/data_model_architecture.md`](docs/data_model_architecture.md) for how it's loaded.
 
 ---
+
+## AI coach pipeline
+
+The coach answers questions about the current reading in four stages, and the dashboard shows which path produced each answer.
+
+1. **Ground.** A structured summary of the live window (effort estimate, trend, top drivers, deviations from the athlete's own usual, signal-quality flags) is the only source of numbers.
+2. **Retrieve.** The question, with everyday phrases such as "muscle fibre tiredness" expanded to the knowledge base's vocabulary, selects up to three physiology notes; the most relevant sentence of each is shown as its snippet.
+3. **Generate.** The first available backend writes a short answer: a custom callable, then **Claude** (set `ANTHROPIC_API_KEY`; model via `AI_COACH_MODEL`, default `claude-haiku-5-5`), then a local **Ollama** model, then a deterministic template. The prompt adapts to the question type (advice, meaning, reliability, summary, why) and carries earlier turns, so follow-ups work.
+4. **Verify and repair.** Every number in the draft must appear in the grounded summary, and medical or diagnostic wording is rejected. A failed draft is sent back once with the specific problem; if the second draft also fails, the template answer is shown and the reason is reported (`fallback_reason`).
+
+`POST /api/rag/explain` returns `answer`, `source` (`llm` or `template`), `fallback_reason`, `source_details`, `follow_ups` and the verification result. `GET /api/health` reports the active engine, which the dashboard shows in the sidebar. With no key and no Ollama the coach still works in rule-based mode.
+
 
 ## Model Details
 
@@ -406,7 +420,7 @@ In the dashboard, this becomes the **Why?** tab: plain-language "what influenced
 | Personalized Prediction | The population-level prediction blended with this athlete's own baseline deviation |
 | Similarity Analysis | Configurable cosine/Euclidean similarity search to find the most physiologically similar participants |
 
-In the dashboard's **About You** tab, this becomes the athlete's real details plus an "Average athlete → This athlete" comparison of the fatigue chance.
+In the dashboard's **Athlete profile** tab, this becomes the athlete's real details plus an "Average athlete → This athlete" comparison of the fatigue chance.
 
 ---
 

@@ -110,6 +110,9 @@ def health_check():
         "framework": "Agentic Fatigue Fingerprinting",
         "dataset": "WSD4FEDSRM",
         "agents_active": 4,
+        "llm_backend": hybrid_router._llm_backend,
+        "llm_model": hybrid_router.llm_model,
+        "kb_backend": rag_kb.retrieval_backend,
         "active_subjects": len(replay_engine.list_available_subjects()),
     }
 
@@ -191,6 +194,13 @@ def run_agent_analysis(req: AnalysisRequest):
     }
 
 
+class ChatTurn(BaseModel):
+    """One earlier message in an Ask-the-coach conversation."""
+
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(max_length=2000)
+
+
 class RAGExplainRequest(BaseModel):
     """Request body for `/api/rag/explain`.
 
@@ -208,6 +218,10 @@ class RAGExplainRequest(BaseModel):
     previous_rpe: Optional[float] = Field(default=None)
     time_span_seconds: Optional[float] = Field(default=None)
     shap_values: Optional[Dict[str, float]] = Field(default=None)
+    history: Optional[List[ChatTurn]] = Field(
+        default=None, max_length=12,
+        description="Earlier turns of this conversation, oldest first, so follow-up questions keep their context",
+    )
 
 
 def _signals_from_step(step_data: Dict[str, Any]) -> Dict[str, np.ndarray]:
@@ -312,8 +326,19 @@ def get_rag_explanation(req: RAGExplainRequest):
         model_name=EXPLAINED_MODEL_NAME,
     )
 
-    resp = hybrid_router.explain(summary, user_query=req.user_query, force_trigger=True)
+    history = [turn.model_dump() for turn in req.history] if req.history else None
+    resp = hybrid_router.explain(summary, user_query=req.user_query, force_trigger=True, history=history)
     return {
+        "answer": resp.answer,
+        "headline": resp.headline,
+        "intent": resp.intent,
+        "source": "llm" if resp.is_llm_generated else "template",
+        "fallback_reason": resp.fallback_reason,
+        "attempts": resp.attempts,
+        "verification": resp.verification,
+        "source_details": resp.source_details,
+        "follow_ups": resp.follow_ups,
+        "llm_model": resp.llm_model,
         "explanation": resp.text,
         "is_llm_generated": resp.is_llm_generated,
         "triggered_by": resp.triggered_by,
