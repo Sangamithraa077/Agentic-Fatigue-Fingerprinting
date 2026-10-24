@@ -54,3 +54,30 @@ def test_streaming_window_processor_pipeline():
     assert 6.0 <= result.smoothed_rpe <= 20.0
     assert result.explanation is not None
     assert "EMG_RMS_AntDeltoid" in result.features
+
+
+def _fill_window(processor, sim, start_s):
+    for i in range(10):
+        for pkt in sim.generate_frame(time_elapsed_s=start_s + i * 0.1).values():
+            processor.ingest_packet(pkt)
+
+
+def test_streaming_summary_reports_no_invented_numbers_and_flags_surrogate():
+    processor = StreamingWindowProcessor(subject_id="P03")
+    sim = HardwareSimulator(batch_duration_s=0.1)
+    _fill_window(processor, sim, 0.0)
+    result = processor.process_window(force_explain=True)
+    assert result.explanation.answer
+    assert "test formula" in result.explanation.answer or "simulated" in result.explanation.answer.lower()
+
+
+def test_streaming_first_window_has_no_fake_trend_and_second_has_real_previous():
+    processor = StreamingWindowProcessor(subject_id="P03")
+    sim = HardwareSimulator(batch_duration_s=0.1)
+    _fill_window(processor, sim, 0.0)
+    first = processor.process_window()
+    assert processor.previous_smoothed_rpe is None
+    assert first.smoothed_rpe == first.raw_predicted_rpe  # seeded, not pulled toward 6.0
+    _fill_window(processor, sim, 1.0)
+    processor.process_window()
+    assert processor.previous_smoothed_rpe == first.smoothed_rpe or abs(processor.previous_smoothed_rpe - first.smoothed_rpe) < 0.01

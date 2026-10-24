@@ -94,3 +94,22 @@ def test_glossary_helpers():
     assert feature_label("brand_new_feature") == "brand new feature"
     assert "CALIBRATED_TO_P01" not in humanise_text("mean (CALIBRATED_TO_P01) slope_sign_changes")
     assert "median frequency" in expand_query("muscle fibre tiredness")
+
+
+def test_evaluation_battery_meets_the_module_13_checks():
+    from ml.rag.evaluator import LLMLayerEvaluator
+
+    evaluator = LLMLayerEvaluator()
+    assert LLMLayerEvaluator.RETRIEVAL_TEST_QUERY_COUNT == len(evaluator.RETRIEVAL_TEST_QUERIES) == 20
+    top1, top3 = evaluator.evaluate_retrieval_quality()
+    assert top3 >= 80.0
+    rate, passed, total = evaluator.evaluate_hallucination_robustness()
+    assert total == 10 and rate == 100.0
+
+
+def test_out_of_scope_question_is_declined_without_llm_or_sources():
+    llm = MagicMock(return_value="Their blood pressure is 120.")
+    resp = _router(llm).explain(_summary(), "What is their blood pressure?", force_trigger=True)
+    assert resp.intent == "out_of_scope" and resp.fallback_reason == "out_of_scope"
+    assert not llm.called and not resp.retrieved_sources
+    assert "can't tell that" in resp.answer

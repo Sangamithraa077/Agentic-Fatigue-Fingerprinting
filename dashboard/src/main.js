@@ -960,6 +960,7 @@ function initSafetyCheck() {
 // ---------------------------------------------------------------------------
 
 const FALLBACK_REASONS = {
+  out_of_scope: 'That question is outside what the sensors measure, so the coach declined to guess.',
   no_llm_configured: 'No language model is connected, so this answer is built directly from the measurements.',
   ungrounded_numbers: 'The AI draft quoted a figure that is not in the data, so a verified summary is shown instead.',
   prohibited_term: 'The AI draft used medical wording, which this system does not allow, so a verified summary is shown instead.',

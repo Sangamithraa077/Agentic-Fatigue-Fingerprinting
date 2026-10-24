@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from ml.rag.feature_glossary import effort_word, expand_query, feature_label, humanise_text
+from ml.rag.feature_glossary import effort_word, feature_label, humanise_text
 from ml.rag.knowledge_retriever import KnowledgeChunk, LocalRAGKnowledgeBase
 from ml.rag.number_checker import NumberChecker
 from ml.rag.session_summary import SessionSummary
@@ -86,11 +86,25 @@ SYSTEM_PROMPT = (
 # Question intents, in priority order. Used to shape the prompt, the template
 # answer and the suggested follow-up questions.
 _INTENT_PATTERNS: Tuple[Tuple[str, re.Pattern], ...] = (
+    # Things the sensors cannot tell us. Checked first so the coach declines instead of guessing.
+    ("out_of_scope", re.compile(
+        r"\b(blood pressure|oxygen|spo2|body temperature|temperature|sleep|diet|nutrition|calorie|hydrat\w*|"
+        r"eat|food|drink|supplements?|protein|caffeine|"
+        r"weather|injur\w*|pain|medicat\w*|diagnos\w*|surgery|win|race|competition|will i|"
+        r"future|tomorrow|next week|other athletes?|compare me|salary|age of|who is)\b", re.I)),
     ("reliability", re.compile(r"\b(reliable|accurate|accuracy|trust|confiden|error|sure)\b", re.I)),
     ("advice", re.compile(r"\b(should|stop|rest|continue|keep going|slow down|safe|what (?:do|now|next)|recover)\b", re.I)),
     ("meaning", re.compile(r"\b(what (?:does|is|are)|mean|means|define|explain what)\b", re.I)),
     ("why", re.compile(r"\b(why|driver|reason|cause|because|behind)\b", re.I)),
     ("progress", re.compile(r"\b(summary|summari[sz]e|overview|brief|how (?:am|is|are|has)|so far|progress|trend)\b", re.I)),
+)
+
+
+OUT_OF_SCOPE_ANSWER = (
+    "I can't tell that from this athlete's readings. The sensors measure muscle activity, arm movement and "
+    "pulse, and the coach estimates effort on the 6 to 20 Borg scale from them. For pain, injury or any "
+    "health concern, please speak to a qualified professional. I can explain the current effort reading, "
+    "what is driving it, or what to do next."
 )
 
 
@@ -320,6 +334,7 @@ class HybridRouter:
             "reliability": ["Why is the effort at this level?", "What should I do now?", "What does the borg scale mean?"],
             "progress": ["What should I do now?", "Why is the effort at this level?", "How reliable is this estimate?"],
             "general": ["Why is the effort at this level?", "What should I do now?", "Give me a quick session summary"],
+            "out_of_scope": ["Why is the effort at this level?", "What should I do now?", "How reliable is this estimate?"],
         }
         picks = pool.get(intent, pool["general"])
         if summary.current_fatigue_index >= self.rpe_warning_threshold and "What should I do now?" not in picks:
@@ -355,6 +370,8 @@ class HybridRouter:
         caution = ""
         if "RPE_IS_PROBABILITY_PROXY_NOT_REGRESSION" in flags:
             caution = "This is an early, rough figure from the fatigue detector, so treat it with extra care."
+        elif "SURROGATE_ESTIMATE_NOT_A_TRAINED_MODEL" in flags:
+            caution = "This figure comes from a simple test formula on simulated sensor data, not from the trained model."
 
         if intent == "advice":
             parts = [self._advice_line(summary), status]
@@ -512,15 +529,39 @@ class HybridRouter:
                 follow_ups=self._suggest_follow_ups(summary, intent),
             )
 
+        if intent == "out_of_scope":
+            # Decline deterministically: no retrieval, no language model, nothing to hallucinate.
+            total_time_ms = (time.perf_counter() - t0) * 1000.0
+            self.call_logs.append({
+                "timestamp": time.time(), "person_id": summary.person_id, "rpe": summary.current_fatigue_index,
+                "trigger": trigger_reason, "intent": intent, "is_llm": False, "attempts": 0,
+                "fallback_reason": "out_of_scope", "sources": [], "delay_ms": total_time_ms,
+            })
+            del self.call_logs[:-MAX_CALL_LOGS]
+            return ExplanationResponse(
+                text=OUT_OF_SCOPE_ANSWER + SAFETY_DISCLAIMER,
+                triggered_by=trigger_reason,
+                is_llm_generated=False,
+                retrieved_sources=[],
+                verification_passed=True,
+                execution_time_ms=total_time_ms,
+                answer=OUT_OF_SCOPE_ANSWER,
+                headline=_first_sentence(OUT_OF_SCOPE_ANSWER),
+                intent=intent,
+                fallback_reason="out_of_scope",
+                llm_backend=self._llm_backend,
+                follow_ups=self._suggest_follow_ups(summary, intent),
+            )
+
         # 1. Retrieve knowledge. The question leads the query (everyday phrases are expanded to the
         #    knowledge base's vocabulary); athlete IDs are noise for retrieval and are left out.
         driver_terms = " ".join(feature_label(f["feature"]) for f in summary.top_contributing_features)
         if user_query:
-            search_query = f"{expand_query(user_query)} {expand_query(user_query)}"
+            search_query = f"{user_query} {user_query}"
             if intent in ("why", "progress", "general"):
                 search_query += f" fatigue {driver_terms}"
         else:
-            search_query = expand_query(f"fatigue {summary.fatigue_trend.replace('_', ' ').lower()} {driver_terms}")
+            search_query = f"fatigue {summary.fatigue_trend.replace('_', ' ').lower()} {driver_terms}"
         if intent == "reliability":
             search_query += " estimate error uncertainty validation"
         retrieved_results = self.kb.search(search_query, top_k=3)
